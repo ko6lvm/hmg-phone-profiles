@@ -64,7 +64,7 @@ def test_java_actuator_ipc(actuator_path):
 def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     helper_path = os.path.join(repo_root, "package", "svc", "helper.sh")
-    actuator_path = os.path.join(repo_root, "app", "src", "main", "java", "autoprofile", "selector", "VehicleActuator.java")
+    actuator_path = os.path.join(repo_root, "app", "src", "main", "java", "hmg", "phone", "profiles", "VehicleActuator.java")
 
     test_helper_script_ipc(helper_path)
     test_java_actuator_ipc(actuator_path)

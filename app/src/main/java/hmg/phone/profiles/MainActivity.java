@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.app.Activity;
 import android.graphics.Typeface;
@@ -23,7 +23,7 @@ import java.io.File;
  * with Holo Dark styling and Hyundai Sans / Kia Cube typography.
  */
 public class MainActivity extends Activity {
-    private static final String TAG = "AutoProfile.Main";
+    private static final String TAG = "HmgPhoneProfiles.Main";
 
     private ProfileConfig mConfig;
     private Handler mHandler;
@@ -528,11 +528,17 @@ public class MainActivity extends Activity {
                 final String currentDriverName = VehicleActuator.getUserName(currentUid);
 
                 // 4. Check daemon status
-                File pidFile = new File("/data/nemesis/apps/autoprofile.selector/data/helper.pid");
+                File pidFile = new File("/data/nemesis/apps/hmg-phone-profiles/data/helper.pid");
+                if (!pidFile.exists()) {
+                    pidFile = new File("/data/nemesis/apps/autoprofile.selector/data/helper.pid");
+                }
                 if (!pidFile.exists()) {
                     pidFile = new File("/data/local/tmp/autoprofile_helper.pid");
                 }
-                File stateFile = new File("/data/nemesis/apps/autoprofile.selector/data/state.json");
+                File stateFile = new File("/data/nemesis/apps/hmg-phone-profiles/data/state.json");
+                if (!stateFile.exists()) {
+                    stateFile = new File("/data/nemesis/apps/autoprofile.selector/data/state.json");
+                }
                 if (!stateFile.exists()) {
                     stateFile = new File("/data/local/tmp/autoprofile_state.json");
                 }

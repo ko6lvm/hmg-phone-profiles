@@ -27,14 +27,14 @@ def test_nemesis_data(content, source_label="NEMESIS.data"):
 
     # id
     pkg_id = nemesis.get("id", "")
-    assert pkg_id == "autoprofile.selector", f"Unexpected package id: {pkg_id}"
+    assert pkg_id == "hmg-phone-profiles", f"Unexpected package id: {pkg_id}"
     assert len(pkg_id) <= 64, f"id exceeds 64 chars: {len(pkg_id)}"
     assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", pkg_id), f"id format invalid: {pkg_id}"
     print(f"  ✓ Package id: {pkg_id}")
 
     # name
     name = nemesis.get("name", "")
-    assert name == "Auto Profile Selector", f"Unexpected package name: {name}"
+    assert name == "HMG Phone Profiles", f"Unexpected package name: {name}"
     print(f"  ✓ Package name: {name}")
 
     # author
@@ -72,7 +72,7 @@ def test_nemesis_data(content, source_label="NEMESIS.data"):
     assert nemesis.get("target-os", "") != "", "target-os alias missing"
     assert nemesis.get("models", "") != "", "models field missing"
     assert nemesis.get("model", "") != "", "model alias missing"
-    assert nemesis.get("package", "") == "autoprofile.selector", "package alias missing or mismatch"
+    assert nemesis.get("package", "") == "hmg-phone-profiles", "package alias missing or mismatch"
     print(f"  ✓ os / target-os: {nemesis.get('os')} | models / model: {nemesis.get('models')}")
 
     # hooks
@@ -85,20 +85,20 @@ def test_nemesis_data(content, source_label="NEMESIS.data"):
     app0 = config["app.0"]
     assert app0.get("kind") == "apk", f"app.0 kind must be apk: {app0.get('kind')}"
     assert app0.get("path") == "app/AutoProfile.apk", f"app.0 path invalid: {app0.get('path')}"
-    assert app0.get("package") == "autoprofile.selector", f"app.0 package invalid: {app0.get('package')}"
-    assert app0.get("component") == "autoprofile.selector/.MainActivity", f"app.0 component invalid: {app0.get('component')}"
+    assert app0.get("package") == "hmg.phone.profiles", f"app.0 package invalid: {app0.get('package')}"
+    assert app0.get("component") == "hmg.phone.profiles/.MainActivity", f"app.0 component invalid: {app0.get('component')}"
     assert app0.get("uid") == "root", f"app.0 uid invalid: {app0.get('uid')}"
-    print("  ✓ [app.0] section valid (kind=apk, entry component=autoprofile.selector/.MainActivity)")
+    print("  ✓ [app.0] section valid (kind=apk, entry component=hmg.phone.profiles/.MainActivity)")
 
     # 3. Section [service.0]
     assert config.has_section("service.0"), "Missing [service.0] section"
     svc0 = config["service.0"]
-    assert svc0.get("name") == "autoprofile-daemon", f"service.0 name invalid: {svc0.get('name')}"
+    assert svc0.get("name") == "hmg-phone-profiles-daemon", f"service.0 name invalid: {svc0.get('name')}"
     assert svc0.get("kind") == "sh", f"service.0 kind invalid: {svc0.get('kind')}"
     assert svc0.get("path") == "svc/helper.sh", f"service.0 path invalid: {svc0.get('path')}"
     assert svc0.get("uid") == "root", f"service.0 uid invalid: {svc0.get('uid')}"
     assert svc0.get("mode") == "restart", f"service.0 mode invalid: {svc0.get('mode')}"
-    print("  ✓ [service.0] section valid (name=autoprofile-daemon, kind=sh, mode=restart, uid=root)")
+    print("  ✓ [service.0] section valid (name=hmg-phone-profiles-daemon, kind=sh, mode=restart, uid=root)")
 
     print(f"[{source_label}] ALL NEMESIS SPEC CHECKS PASSED!\n")
 
@@ -112,12 +112,12 @@ def main():
         test_nemesis_data(f.read(), "package/NEMESIS.data")
 
     # Check zip contents
-    zip_path = os.path.join(repo_root, "autoprofile.selector.zip")
+    zip_path = os.path.join(repo_root, "hmg-phone-profiles.zip")
     if os.path.exists(zip_path):
         with zipfile.ZipFile(zip_path, 'r') as z:
             assert "NEMESIS.data" in z.namelist(), "NEMESIS.data missing from zip root"
             zip_content = z.read("NEMESIS.data").decode("utf-8")
-            test_nemesis_data(zip_content, "ZIP autoprofile.selector.zip:NEMESIS.data")
+            test_nemesis_data(zip_content, "ZIP hmg-phone-profiles.zip:NEMESIS.data")
 
 if __name__ == "__main__":
     main()

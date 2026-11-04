@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

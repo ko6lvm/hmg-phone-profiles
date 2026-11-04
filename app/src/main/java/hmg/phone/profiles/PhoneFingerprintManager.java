@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;

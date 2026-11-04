@@ -2,7 +2,7 @@
 # ==============================================================================
 # build.sh — Standalone NEMESIS Package & Android APK Build System
 # Target: 2024 Hyundai Ioniq 5 Limited (Gen5W, Android 4.4.2 KitKat / API 19)
-# Package: autoprofile.selector
+# Package: hmg-phone-profiles
 # ==============================================================================
 
 set -euo pipefail
@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "======================================================================"
-echo " Building NEMESIS Package: autoprofile.selector"
+echo " Building NEMESIS Package: hmg-phone-profiles"
 echo " Target: Gen5W / Android 4.4.2 KitKat (API 19) / Firmware 260507"
 echo "======================================================================"
 
@@ -132,15 +132,15 @@ java -jar "$APKSIGNER_JAR" verify --verbose "$FINAL_APK" > "$APP_BUILD/verify.lo
 echo "    APK Signature verified: v1=true, v2=true"
 
 # ------------------------------------------------------------------------------
-# 7. Assemble and Create NEMESIS Package ZIP (autoprofile.selector.zip)
+# 7. Assemble and Create NEMESIS Package ZIP (hmg-phone-profiles.zip)
 # ------------------------------------------------------------------------------
 echo ">>> [7/8] Assembling NEMESIS package zip..."
 
 # Ensure executable permissions on all shell scripts
 chmod 755 package/svc/helper.sh package/scripts/*.sh
 
-OUTPUT_ZIP="$SCRIPT_DIR/autoprofile.selector.zip"
-rm -f "$OUTPUT_ZIP"
+OUTPUT_ZIP="$SCRIPT_DIR/hmg-phone-profiles.zip"
+rm -f "$OUTPUT_ZIP" "$SCRIPT_DIR/autoprofile.selector.zip"
 
 cd "$SCRIPT_DIR/package"
 "$ZIP_BIN" -r -9 "$OUTPUT_ZIP" \
@@ -152,7 +152,7 @@ cd "$SCRIPT_DIR/package"
 cd "$SCRIPT_DIR"
 
 # ------------------------------------------------------------------------------
-# 8. Create Ready-to-Copy USB Installer (build/usb-stick & autoprofile.selector-usb.zip)
+# 8. Create Ready-to-Copy USB Installer (build/usb-stick & hmg-phone-profiles-usb.zip)
 # ------------------------------------------------------------------------------
 echo ">>> [8/8] Creating USB installer bundle..."
 USB_DIR="$BUILD_DIR/usb-stick"
@@ -160,20 +160,20 @@ rm -rf "$USB_DIR"
 mkdir -p "$USB_DIR/packages"
 
 # 1. Copy package zip into packages/
-cp "$OUTPUT_ZIP" "$USB_DIR/packages/autoprofile.selector.zip"
+cp "$OUTPUT_ZIP" "$USB_DIR/packages/hmg-phone-profiles.zip"
 
 # 2. Create the USB root trigger descriptor (type=install)
 cat > "$USB_DIR/NEMESIS.data" << 'EOF'
 [nemesis]
 version=1.1
 type=install
-path=packages/autoprofile.selector.zip
-name=Auto Profile Selector
+path=packages/hmg-phone-profiles.zip
+name=HMG Phone Profiles
 EOF
 
 # 3. Create ready-to-extract USB installer ZIP
-USB_ZIP="$SCRIPT_DIR/autoprofile.selector-usb.zip"
-rm -f "$USB_ZIP"
+USB_ZIP="$SCRIPT_DIR/hmg-phone-profiles-usb.zip"
+rm -f "$USB_ZIP" "$SCRIPT_DIR/autoprofile.selector-usb.zip"
 cd "$USB_DIR"
 "$ZIP_BIN" -r -9 "$USB_ZIP" NEMESIS.data packages/ >/dev/null
 cd "$SCRIPT_DIR"
@@ -181,8 +181,8 @@ cd "$SCRIPT_DIR"
 # Mirror to ~/ioniq5_data if directory exists
 DATA_DIR="${IONIQ5_DATA_DIR:-$HOME/ioniq5_data}"
 if [ -d "$DATA_DIR" ]; then
-    cp "$OUTPUT_ZIP" "$DATA_DIR/autoprofile.selector.zip"
-    cp "$USB_ZIP" "$DATA_DIR/autoprofile.selector-usb.zip"
+    cp "$OUTPUT_ZIP" "$DATA_DIR/hmg-phone-profiles.zip"
+    cp "$USB_ZIP" "$DATA_DIR/hmg-phone-profiles-usb.zip"
 fi
 
 # Verify Package Zip Integrity

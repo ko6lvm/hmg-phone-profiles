@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.util.Log;
 
@@ -17,10 +17,11 @@ import java.io.InputStreamReader;
  * run root commands (uid=0) with full Binder access.
  */
 public class RootBridge {
-    private static final String TAG = "AutoProfile.RootBridge";
+    private static final String TAG = "HmgPhoneProfiles.RootBridge";
 
     public static final String NEMESIS_BIN = "/system/xbin/nemesis";
-    public static final String HELPER_PATH = "/data/nemesis/apps/autoprofile.selector/svc/helper.sh";
+    public static final String HELPER_PATH = "/data/nemesis/apps/hmg-phone-profiles/svc/helper.sh";
+    public static final String LEGACY_HELPER_PATH = "/data/nemesis/apps/autoprofile.selector/svc/helper.sh";
     public static final String FALLBACK_HELPER_PATH = "/data/local/tmp/helper.sh";
 
     public static class Result {
@@ -91,6 +92,9 @@ public class RootBridge {
     public static String getHelperExecutable() {
         if (new File(HELPER_PATH).exists()) {
             return HELPER_PATH;
+        }
+        if (new File(LEGACY_HELPER_PATH).exists()) {
+            return LEGACY_HELPER_PATH;
         }
         if (new File(FALLBACK_HELPER_PATH).exists()) {
             return FALLBACK_HELPER_PATH;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# run_all_tests.sh — Comprehensive Test Suite for autoprofile.selector
+# run_all_tests.sh — Comprehensive Test Suite for hmg-phone-profiles
 # ==============================================================================
 
 set -euo pipefail
@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "======================================================================"
-echo " Running Full Verification Suite for autoprofile.selector"
+echo " Running Full Verification Suite for hmg-phone-profiles"
 echo "======================================================================"
 
 # Ensure latest package is built

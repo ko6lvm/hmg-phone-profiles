@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # ==============================================================================
-# helper.sh — Root Service Daemon for autoprofile.selector
+# helper.sh — Root Service Daemon for hmg-phone-profiles
 # Target: 2024 Hyundai Ioniq 5 Limited (Gen5W, Android 4.4.2 KitKat, Build 260507)
 # Runs as UID 0 under NEMESIS svcmgr (mode=restart)
 #
@@ -15,14 +15,15 @@
 
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin:$PATH
 
-PKG_DIR="/data/nemesis/apps/autoprofile.selector"
+PKG_DIR="/data/nemesis/apps/hmg-phone-profiles"
+LEGACY_PKG_DIR="/data/nemesis/apps/autoprofile.selector"
 DATA_DIR="$PKG_DIR/data"
 CONFIG_FILE="$PKG_DIR/config.json"
-FALLBACK_CONFIG="/data/local/tmp/autoprofile_config.json"
+FALLBACK_CONFIG="/data/local/tmp/hmg_phone_profiles_config.json"
 PID_FILE="$DATA_DIR/helper.pid"
-FALLBACK_PID="/data/local/tmp/autoprofile_helper.pid"
+FALLBACK_PID="/data/local/tmp/hmg_phone_profiles_helper.pid"
 STATE_FILE="$DATA_DIR/state.json"
-FALLBACK_STATE="/data/local/tmp/autoprofile_state.json"
+FALLBACK_STATE="/data/local/tmp/hmg_phone_profiles_state.json"
 
 mkdir -p "$DATA_DIR" 2>/dev/null || true
 chmod 777 "$DATA_DIR" 2>/dev/null || true
@@ -274,10 +275,20 @@ get_bonded_devices() {
 # ------------------------------------------------------------------------------
 
 sync_and_get_config_path() {
+    # If legacy autoprofile.selector config exists, copy over
+    if [ ! -f "$CONFIG_FILE" ] && [ -f "$LEGACY_PKG_DIR/config.json" ]; then
+        mkdir -p "$DATA_DIR" 2>/dev/null || true
+        cp -f "$LEGACY_PKG_DIR/config.json" "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
     # If fallback config is newer, sync back to primary config
     if [ -f "$FALLBACK_CONFIG" ]; then
         if [ ! -f "$CONFIG_FILE" ] || [ "$FALLBACK_CONFIG" -nt "$CONFIG_FILE" ]; then
             cp -f "$FALLBACK_CONFIG" "$CONFIG_FILE" 2>/dev/null || true
+        fi
+    elif [ -f "/data/local/tmp/autoprofile_config.json" ]; then
+        if [ ! -f "$CONFIG_FILE" ]; then
+            cp -f "/data/local/tmp/autoprofile_config.json" "$CONFIG_FILE" 2>/dev/null || true
         fi
     fi
 
@@ -285,6 +296,8 @@ sync_and_get_config_path() {
         echo "$CONFIG_FILE"
     elif [ -f "$FALLBACK_CONFIG" ]; then
         echo "$FALLBACK_CONFIG"
+    elif [ -f "/data/local/tmp/autoprofile_config.json" ]; then
+        echo "/data/local/tmp/autoprofile_config.json"
     else
         echo ""
     fi
@@ -380,12 +393,14 @@ update_state_file() {
 run_daemon() {
     echo "$$" > "$PID_FILE" 2>/dev/null || true
     echo "$$" > "$FALLBACK_PID" 2>/dev/null || true
+    echo "$$" > "/data/local/tmp/autoprofile_helper.pid" 2>/dev/null || true
     chmod 666 "$PID_FILE" 2>/dev/null || true
     chmod 666 "$FALLBACK_PID" 2>/dev/null || true
+    chmod 666 "/data/local/tmp/autoprofile_helper.pid" 2>/dev/null || true
 
-    echo "[autoprofile.selector] Daemon started with PID $$."
+    echo "[hmg-phone-profiles] Daemon started with PID $$."
 
-    trap 'echo "[autoprofile.selector] Shutting down..."; rm -f "$PID_FILE" "$FALLBACK_PID"; exit 0' SIGTERM SIGINT
+    trap 'echo "[hmg-phone-profiles] Shutting down..."; rm -f "$PID_FILE" "$FALLBACK_PID" "/data/local/tmp/autoprofile_helper.pid"; exit 0' SIGTERM SIGINT
 
     last_switched_driver=0
 
@@ -550,9 +565,9 @@ case "$cmd" in
         run_daemon
         ;;
     status)
-        echo "=== autoprofile.selector Helper Status ==="
+        echo "=== hmg-phone-profiles Helper Status ==="
         pid=""
-        for pf in "$PID_FILE" "$FALLBACK_PID"; do
+        for pf in "$PID_FILE" "$FALLBACK_PID" "/data/nemesis/apps/autoprofile.selector/data/helper.pid" "/data/local/tmp/autoprofile_helper.pid"; do
             if [ -f "$pf" ]; then
                 pid=$(cat "$pf" 2>/dev/null)
                 break

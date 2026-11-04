@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.content.Context;
 import android.content.Intent;
@@ -18,7 +18,7 @@ import java.lang.reflect.Method;
  * is in Park (P) via com.hkmc.micom.system Tx 36 before execution.
  */
 public class VehicleActuator {
-    private static final String TAG = "AutoProfile.Actuator";
+    private static final String TAG = "HmgPhoneProfiles.Actuator";
 
     // Binder service names
     public static final String SVC_SYSTEM = "com.hkmc.micom.system";

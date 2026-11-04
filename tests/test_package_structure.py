@@ -9,7 +9,7 @@ import zipfile
 
 def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    zip_path = os.path.join(repo_root, "autoprofile.selector.zip")
+    zip_path = os.path.join(repo_root, "hmg-phone-profiles.zip")
     assert os.path.exists(zip_path), f"Package zip not found: {zip_path}"
 
     expected_files = {
@@ -20,7 +20,7 @@ def main():
         "scripts/preun.sh",
     }
 
-    print("Verifying NEMESIS package structure in autoprofile.selector.zip...")
+    print("Verifying NEMESIS package structure in hmg-phone-profiles.zip...")
     with zipfile.ZipFile(zip_path, 'r') as z:
         names = set(z.namelist())
         for f in expected_files:
@@ -38,19 +38,19 @@ def main():
         assert apk_info.file_size > 100_000, f"APK suspiciously small: {apk_info.file_size} bytes"
 
     # Verify USB installer ZIP if present
-    usb_zip_path = os.path.join(repo_root, "autoprofile.selector-usb.zip")
+    usb_zip_path = os.path.join(repo_root, "hmg-phone-profiles-usb.zip")
     if os.path.exists(usb_zip_path):
-        print("Verifying USB installer structure in autoprofile.selector-usb.zip...")
+        print("Verifying USB installer structure in hmg-phone-profiles-usb.zip...")
         with zipfile.ZipFile(usb_zip_path, 'r') as uz:
             unames = set(uz.namelist())
             assert "NEMESIS.data" in unames, "USB installer missing root NEMESIS.data"
-            assert "packages/autoprofile.selector.zip" in unames, "USB installer missing packages/autoprofile.selector.zip"
+            assert "packages/hmg-phone-profiles.zip" in unames, "USB installer missing packages/hmg-phone-profiles.zip"
             # Read root descriptor
             desc = uz.read("NEMESIS.data").decode("utf-8")
             assert "type=install" in desc, f"USB root NEMESIS.data must be type=install, got:\n{desc}"
-            assert "path=packages/autoprofile.selector.zip" in desc, f"USB root NEMESIS.data invalid path:\n{desc}"
+            assert "path=packages/hmg-phone-profiles.zip" in desc, f"USB root NEMESIS.data invalid path:\n{desc}"
             print("  ✓ Found USB trigger NEMESIS.data (type=install)")
-            print("  ✓ Found payload packages/autoprofile.selector.zip")
+            print("  ✓ Found payload packages/hmg-phone-profiles.zip")
 
     # Also verify local package folder permissions
     scripts = [

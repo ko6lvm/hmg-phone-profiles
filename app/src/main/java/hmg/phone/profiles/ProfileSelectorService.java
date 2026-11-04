@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -9,14 +9,14 @@ import android.os.IBinder;
 import android.util.Log;
 
 /**
- * Background service for autoprofile.selector.
+ * Background service for hmg-phone-profiles.
  * Monitors vehicle start and radio state events, gating actions strictly on Park (P).
  */
 public class ProfileSelectorService extends Service {
-    private static final String TAG = "AutoProfile.Service";
+    private static final String TAG = "HmgPhoneProfiles.Service";
 
-    public static final String ACTION_CHECK_SWITCH = "autoprofile.selector.CHECK_SWITCH";
-    public static final String ACTION_TRIGGER_SWITCH = "autoprofile.selector.TRIGGER_SWITCH";
+    public static final String ACTION_CHECK_SWITCH = "hmg.phone.profiles.CHECK_SWITCH";
+    public static final String ACTION_TRIGGER_SWITCH = "hmg.phone.profiles.TRIGGER_SWITCH";
     public static final String EXTRA_TARGET_DRIVER = "extra_target_driver";
 
     private ProfileConfig mConfig;

@@ -1,10 +1,10 @@
 [nemesis]
 version=1.1
-id=autoprofile.selector
-package=autoprofile.selector
-package-name=autoprofile.selector
-name=Auto Profile Selector
-label=Auto Profile Selector
+id=hmg-phone-profiles
+package=hmg-phone-profiles
+package-name=hmg-phone-profiles
+name=HMG Phone Profiles
+label=HMG Phone Profiles
 type=application,service
 package-version=1.0.0
 author=AutoProfile Team
@@ -21,12 +21,12 @@ preuninstall=scripts/preun.sh
 [app.0]
 kind=apk
 path=app/AutoProfile.apk
-package=autoprofile.selector
-component=autoprofile.selector/.MainActivity
+package=hmg.phone.profiles
+component=hmg.phone.profiles/.MainActivity
 uid=root
 
 [service.0]
-name=autoprofile-daemon
+name=hmg-phone-profiles-daemon
 kind=sh
 path=svc/helper.sh
 uid=root

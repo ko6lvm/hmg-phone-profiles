@@ -13,5 +13,5 @@ test:
 verify: test
 
 clean:
-	@rm -rf build autoprofile.selector.zip package/app/AutoProfile.apk
+	@rm -rf build hmg-phone-profiles.zip hmg-phone-profiles-usb.zip autoprofile.selector.zip autoprofile.selector-usb.zip package/app/AutoProfile.apk
 	@echo "Clean completed."

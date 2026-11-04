@@ -1,4 +1,4 @@
-package autoprofile.selector;
+package hmg.phone.profiles;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -19,11 +19,13 @@ import java.util.List;
  * Syncs with NEMESIS config.json and fallback SharedPreferences.
  */
 public class ProfileConfig {
-    private static final String TAG = "AutoProfile.Config";
+    private static final String TAG = "HmgPhoneProfiles.Config";
 
-    public static final String PRIMARY_CONFIG_PATH = "/data/nemesis/apps/autoprofile.selector/config.json";
-    public static final String FALLBACK_CONFIG_PATH = "/data/local/tmp/autoprofile_config.json";
-    private static final String PREF_NAME = "autoprofile_prefs";
+    public static final String PRIMARY_CONFIG_PATH = "/data/nemesis/apps/hmg-phone-profiles/config.json";
+    public static final String LEGACY_CONFIG_PATH = "/data/nemesis/apps/autoprofile.selector/config.json";
+    public static final String FALLBACK_CONFIG_PATH = "/data/local/tmp/hmg_phone_profiles_config.json";
+    public static final String LEGACY_FALLBACK_CONFIG_PATH = "/data/local/tmp/autoprofile_config.json";
+    private static final String PREF_NAME = "hmg_phone_profiles_prefs";
 
     public static class PhoneItem {
         public int id;
@@ -80,14 +82,18 @@ public class ProfileConfig {
     public void load(Context context) {
         File primary = new File(PRIMARY_CONFIG_PATH);
         File fallback = new File(FALLBACK_CONFIG_PATH);
+        File legacy = new File(LEGACY_CONFIG_PATH);
+        File legacyFallback = new File(LEGACY_FALLBACK_CONFIG_PATH);
         File file = null;
 
-        if (primary.exists() && fallback.exists()) {
-            file = (fallback.lastModified() > primary.lastModified()) ? fallback : primary;
-        } else if (primary.exists()) {
+        if (primary.exists()) {
             file = primary;
         } else if (fallback.exists()) {
             file = fallback;
+        } else if (legacy.exists()) {
+            file = legacy;
+        } else if (legacyFallback.exists()) {
+            file = legacyFallback;
         }
 
         if (file != null && file.exists()) {

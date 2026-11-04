@@ -41,8 +41,8 @@ make build
 4. **Packaging**: `aapt` bundles assets (including embedded `Hyundai Sans` and `Kia Cube` fonts) and resources into an unaligned APK.
 5. **Alignment**: `zipalign` aligns uncompressed assets on 4-byte boundaries.
 6. **Signing**: `apksigner` signs the APK with both v1 (JAR signing) and v2 (APK signature scheme v2) for KitKat compatibility.
-7. **NEMESIS Assembly**: Creates `autoprofile.selector.zip` containing `NEMESIS.data`, `app/AutoProfile.apk`, and `svc/helper.sh`.
-8. **USB Installer Bundle**: Creates `autoprofile.selector-usb.zip` and populates `build/usb-stick/` with root `NEMESIS.data` (`type=install`) and `packages/autoprofile.selector.zip`.
+7. **NEMESIS Assembly**: Creates `hmg-phone-profiles.zip` containing `NEMESIS.data`, `app/AutoProfile.apk`, and `svc/helper.sh`.
+8. **USB Installer Bundle**: Creates `hmg-phone-profiles-usb.zip` and populates `build/usb-stick/` with root `NEMESIS.data` (`type=install`) and `packages/hmg-phone-profiles.zip`.
 
 ---
 

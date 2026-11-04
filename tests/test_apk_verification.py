@@ -37,12 +37,12 @@ def main():
     assert res_badging.returncode == 0, f"aapt dump badging failed: {res_badging.stderr}"
     badging_out = res_badging.stdout
 
-    assert "package: name='autoprofile.selector'" in badging_out, "Package name mismatch in APK"
+    assert "package: name='hmg.phone.profiles'" in badging_out, "Package name mismatch in APK"
     assert "sdkVersion:'19'" in badging_out, "minSdkVersion must be 19 (KitKat 4.4.2)"
     assert "targetSdkVersion:'19'" in badging_out, "targetSdkVersion must be 19"
-    assert "launchable-activity: name='autoprofile.selector.MainActivity'" in badging_out, "Launcher activity missing"
-    assert "application-label:'Auto Profile Selector'" in badging_out, "App label mismatch"
-    print("  ✓ AAPT Badging verified (package: autoprofile.selector, SDK: 19, Activity: MainActivity)")
+    assert "launchable-activity: name='hmg.phone.profiles.MainActivity'" in badging_out, "Launcher activity missing"
+    assert "application-label:'HMG Phone Profiles'" in badging_out, "App label mismatch"
+    print("  ✓ AAPT Badging verified (package: hmg.phone.profiles, SDK: 19, Activity: MainActivity)")
 
     # 3. Check Internal Zip Members (fonts, dex, resources)
     with zipfile.ZipFile(apk_path, 'r') as z:

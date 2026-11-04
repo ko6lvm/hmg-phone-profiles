@@ -1,20 +1,34 @@
 #!/system/bin/sh
 # ==============================================================================
-# post.sh — Post-installation activation hook for autoprofile.selector
+# post.sh — Post-installation activation hook for hmg-phone-profiles
 # Runs as root after package directory copy, APK install, and service register.
-# Current working directory: /data/nemesis/apps/autoprofile.selector
+# Current working directory: /data/nemesis/apps/hmg-phone-profiles
 # ==============================================================================
 
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin:$PATH
 
-PKG_DIR="/data/nemesis/apps/autoprofile.selector"
+PKG_DIR="/data/nemesis/apps/hmg-phone-profiles"
 DATA_DIR="$PKG_DIR/data"
 CONFIG_FILE="$PKG_DIR/config.json"
-FALLBACK_CONFIG="/data/local/tmp/autoprofile_config.json"
-FALLBACK_STATE="/data/local/tmp/autoprofile_state.json"
-FALLBACK_PID="/data/local/tmp/autoprofile_helper.pid"
+FALLBACK_CONFIG="/data/local/tmp/hmg_phone_profiles_config.json"
+FALLBACK_STATE="/data/local/tmp/hmg_phone_profiles_state.json"
+FALLBACK_PID="/data/local/tmp/hmg_phone_profiles_helper.pid"
 
-echo "[autoprofile.selector] Running post-install hook..."
+LEGACY_PKG_DIR="/data/nemesis/apps/autoprofile.selector"
+LEGACY_CONFIG="/data/nemesis/apps/autoprofile.selector/config.json"
+
+echo "[hmg-phone-profiles] Running post-install hook..."
+
+# Clean up / migrate legacy autoprofile.selector if upgrading
+if [ -d "$LEGACY_PKG_DIR" ]; then
+    echo "[hmg-phone-profiles] Migrating legacy installation..."
+    if [ -f "$LEGACY_CONFIG" ] && [ ! -f "$CONFIG_FILE" ]; then
+        mkdir -p "$DATA_DIR"
+        cp -f "$LEGACY_CONFIG" "$CONFIG_FILE" 2>/dev/null || true
+    fi
+    rm -rf "$LEGACY_PKG_DIR" 2>/dev/null || true
+    pm uninstall autoprofile.selector 2>/dev/null || true
+fi
 
 # Ensure data directory exists with world-writable permissions so APK can sync state
 mkdir -p "$DATA_DIR"
@@ -33,7 +47,7 @@ fi
 if [ "$needs_init" = "true" ]; then
     bonded=$("$PKG_DIR/svc/helper.sh" bonded 2>/dev/null || true)
     if [ -n "$bonded" ]; then
-        echo "[autoprofile.selector] Populating configuration with active vehicle Bluetooth devices..."
+        echo "[hmg-phone-profiles] Populating configuration with active vehicle Bluetooth devices..."
         cat <<'EOF' > "$CONFIG_FILE"
 {
   "version": 1,
@@ -90,12 +104,18 @@ chmod 666 "$CONFIG_FILE" 2>/dev/null || true
 # Fallback copy for non-root / standard Android process access
 cp -f "$CONFIG_FILE" "$FALLBACK_CONFIG" 2>/dev/null || true
 chmod 666 "$FALLBACK_CONFIG" 2>/dev/null || true
+cp -f "$CONFIG_FILE" "/data/local/tmp/autoprofile_config.json" 2>/dev/null || true
+chmod 666 "/data/local/tmp/autoprofile_config.json" 2>/dev/null || true
 
 # Touch fallback state and pid files with open permissions
 touch "$FALLBACK_STATE" 2>/dev/null || true
 chmod 666 "$FALLBACK_STATE" 2>/dev/null || true
 touch "$FALLBACK_PID" 2>/dev/null || true
 chmod 666 "$FALLBACK_PID" 2>/dev/null || true
+touch "/data/local/tmp/autoprofile_state.json" 2>/dev/null || true
+chmod 666 "/data/local/tmp/autoprofile_state.json" 2>/dev/null || true
+touch "/data/local/tmp/autoprofile_helper.pid" 2>/dev/null || true
+chmod 666 "/data/local/tmp/autoprofile_helper.pid" 2>/dev/null || true
 
-echo "[autoprofile.selector] Post-install completed successfully."
+echo "[hmg-phone-profiles] Post-install completed successfully."
 exit 0

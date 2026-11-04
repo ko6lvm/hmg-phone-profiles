@@ -50,24 +50,24 @@ For your vehicle to be compatible with `hmg-phone-profiles`, it must:
 
 | Step | Action | Description |
 |:---:|---|---|
-| **1** | **Download Package** | Obtain `autoprofile.selector-usb.zip` from releases or build it from source. |
+| **1** | **Download Package** | Obtain `hmg-phone-profiles-usb.zip` from releases or build it from source. |
 | **2** | **Prepare USB Drive** | Format a blank USB flash drive to **FAT32** or **exFAT**. |
-| **3** | **Copy Files** | Extract the contents of `autoprofile.selector-usb.zip` directly to the **root** of the USB drive.<br>The root must contain `NEMESIS.data` and the `packages/` directory. |
+| **3** | **Copy Files** | Extract the contents of `hmg-phone-profiles-usb.zip` directly to the **root** of the USB drive.<br>The root must contain `NEMESIS.data` and the `packages/` directory. |
 | **4** | **Install on Car** | Insert the USB drive into the vehicle's multimedia USB port while Android is running.<br>Tap **Install** when prompted by the native NEMESIS dialog. |
 
 ```
 USB Root Structure:
 ├── NEMESIS.data                              (Trigger descriptor: type=install)
 └── packages/
-    └── autoprofile.selector.zip              (Application & daemon payload)
+    └── hmg-phone-profiles.zip                (Application & daemon payload)
 ```
 
 ---
 
 ## Updating & Uninstallation
 
-- **Updating**: Copy updated `NEMESIS.data` and `packages/autoprofile.selector.zip` to your USB drive and insert into the vehicle. Select **Update** when prompted.
-- **Uninstallation**: Uninstall via NEMESIS Manager on the head unit (**My Packages &gt; Auto Profile Selector &gt; Uninstall**). The package uninstaller cleanly stops the background daemon, removes startup hooks, and uninstalls the companion APK.
+- **Updating**: Copy updated `NEMESIS.data` and `packages/hmg-phone-profiles.zip` to your USB drive and insert into the vehicle. Select **Update** when prompted.
+- **Uninstallation**: Uninstall via NEMESIS Manager on the head unit (**My Packages &gt; HMG Phone Profiles &gt; Uninstall**). The package uninstaller cleanly stops the background daemon, removes startup hooks, and uninstalls the companion APK.
 
 ---
 
@@ -79,7 +79,7 @@ Comprehensive documentation for developers, integrators, and curious owners:
 |---|---|
 | [**01 - Hardware IPC & Safety Architecture**](docs/01-Hardware-IPC-and-Safety.md) | Deep dive into Android Binder transactions, Park gear MICOM gating, and CAN door memory button recall. |
 | [**02 - Radio Fingerprinting & Presence Detection**](docs/02-Radio-Fingerprinting.md) | Multi-radio presence detection, Bluetooth/Wi-Fi tracking, randomized MAC auto-learning, and conflict arbitration. |
-| [**03 - Configuration Reference**](docs/03-Configuration.md) | JSON schema and parameter reference for `/data/nemesis/data/autoprofile.selector/config.json`. |
+| [**03 - Configuration Reference**](docs/03-Configuration.md) | JSON schema and parameter reference for `/data/nemesis/apps/hmg-phone-profiles/config.json`. |
 | [**04 - Building & Verification Guide**](docs/04-Building-and-Testing.md) | Compiling from source, Android SDK toolchain requirements, APK signing, and running the 5-stage verification suite. |
 | [**05 - CLI Test Harness**](docs/05-CLI-Test-Harness.md) | Reference for using `test_profile_ipc.sh` to test vehicle IPC calls live over ADB. |
 
