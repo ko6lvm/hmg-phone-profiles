@@ -27,14 +27,20 @@ def test_helper_script_ipc(helper_path):
     assert "com.hkmc.vr 14" in content, "Missing com.hkmc.vr Tx 14 set_AVNIMSButton_Cmd_AVN"
     assert "cmd=$((target_uid + 3))" in content or ("4" in content and "5" in content), "Missing PBACK_P1=4 / PBACK_P2=5 calculation"
     assert "sleep 1" in content, "Missing 1.0s delay for seat settling"
+    assert "recall_door_seat" in content, "Missing recall_door_seat optional gate in helper.sh"
     print("  ✓ Door seat memory verified: com.hkmc.vr Tx 14 (cmd 4 for D1, 5 for D2 after 1.0s delay)")
 
     # 4. Consent Screen Dismissal: com.hkmc.factory Tx 82 & notification Tx 24
     assert "com.hkmc.factory 82" in content, "Missing com.hkmc.factory Tx 82 hideConsentScreen"
     assert "notification 24" in content, "Missing notification Tx 24 notifyConsentScreenChanged"
-    print("  ✓ ConsentScreen dismissal verified: factory Tx 82 & notification Tx 24")
+    assert "notification 24 i32 0" in content, "notification Tx 24 must pass 0 (dismissed/closed)"
+    print("  ✓ ConsentScreen dismissal verified: factory Tx 82 & notification Tx 24 (passing 0)")
 
-    # 5. Confirmation Toast: com.hkmc.intent.action.TOAST
+    # 5. Loop initialization & safety
+    assert "last_resolved_driver=0" in content, "last_resolved_driver must be initialized before daemon loop"
+    assert "prev_in_park=" in content, "prev_in_park must be initialized before daemon loop"
+
+    # 6. Confirmation Toast: com.hkmc.intent.action.TOAST
     assert "com.hkmc.intent.action.TOAST" in content, "Missing toast intent action"
     assert "com.hkmc.intent.extra.TOAST_MESSAGE" in content, "Missing toast message extra"
     assert "com.hkmc.intent.extra.TOAST_POPUPSHOWING" in content, "Missing popup showing extra"
@@ -59,6 +65,7 @@ def test_java_actuator_ipc(actuator_path):
 
     assert "Thread.sleep(1000)" in content, "Must sleep 1000ms before seat recall"
     assert "!isParkGear()" in content, "Must check isParkGear() in executeSafeSwitch"
+    assert "data.writeInt(0);" in content, "Must pass 0 for closed/dismissed in notifyConsentScreenChanged"
     print("  ✓ Java constants and safety contracts all matched perfectly!")
 
 def main():

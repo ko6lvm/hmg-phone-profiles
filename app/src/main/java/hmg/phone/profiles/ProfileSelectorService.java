@@ -76,7 +76,12 @@ public class ProfileSelectorService extends Service {
     }
 
     private void processPresenceCheck(final String hintMac) {
-        if (mConfig == null) mConfig = ProfileConfig.getInstance(this);
+        if (mConfig == null) {
+            mConfig = ProfileConfig.getInstance(this);
+        } else {
+            mConfig.load(this);
+        }
+
         if (!mConfig.autoSelect) {
             Log.d(TAG, "Auto-select disabled in settings. Skipping.");
             return;
@@ -89,19 +94,28 @@ public class ProfileSelectorService extends Service {
                     // Small delay to allow radio handshake settling
                     Thread.sleep(1500);
 
+                    // Check manual switch cooldown (suppress switch within 60s of manual override)
+                    if (isCooldownActive()) {
+                        Log.i(TAG, "Manual switch cooldown active (<60s). Suppressing presence switch.");
+                        return;
+                    }
+
                     int currentDriver = VehicleActuator.getCurrentUserId();
                     PhoneFingerprintManager.PresenceResult presence =
                         PhoneFingerprintManager.evaluatePresence(mConfig, currentDriver, hintMac);
 
                     int matched = presence.matchedDriver;
                     if (matched > 0 && matched != currentDriver) {
-                        Log.i(TAG, "Presence matched Driver " + matched + " (" + presence.matchedPhoneName + ")");
+                        String trigger = (presence.matchedPhoneName != null && !presence.matchedPhoneName.isEmpty())
+                                ? presence.matchedPhoneName : "Phone";
+                        Log.i(TAG, "Presence matched Driver " + matched + " (" + trigger + ")");
                         VehicleActuator.executeSafeSwitch(
                             getApplicationContext(),
                             matched,
                             mConfig.dismissNotice,
-                            true, // recall seat memory
-                            mConfig.showBanner
+                            mConfig.recallDoorSeat,
+                            mConfig.showBanner,
+                            trigger
                         );
                     }
                 } catch (Throwable t) {
@@ -115,15 +129,46 @@ public class ProfileSelectorService extends Service {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                if (mConfig == null) {
+                    mConfig = ProfileConfig.getInstance(ProfileSelectorService.this);
+                } else {
+                    mConfig.load(ProfileSelectorService.this);
+                }
                 VehicleActuator.executeSafeSwitch(
                     getApplicationContext(),
                     targetDriver,
                     mConfig.dismissNotice,
-                    true,
-                    mConfig.showBanner
+                    mConfig.recallDoorSeat,
+                    mConfig.showBanner,
+                    "Manual"
                 );
             }
         }).start();
+    }
+
+    private boolean isCooldownActive() {
+        java.io.File[] tsFiles = new java.io.File[] {
+            new java.io.File("/data/nemesis/apps/hmg-phone-profiles/data/last_switched_ts"),
+            new java.io.File("/data/local/tmp/hmg_phone_profiles_last_switched_ts"),
+            new java.io.File("/data/local/tmp/last_switched_ts")
+        };
+        long now = System.currentTimeMillis() / 1000;
+        for (java.io.File f : tsFiles) {
+            if (f.exists()) {
+                try {
+                    java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(f));
+                    String line = br.readLine();
+                    br.close();
+                    if (line != null && !line.trim().isEmpty()) {
+                        long ts = Long.parseLong(line.trim());
+                        if (now - ts >= 0 && now - ts < 60) {
+                            return true;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+        return false;
     }
 
     @Override

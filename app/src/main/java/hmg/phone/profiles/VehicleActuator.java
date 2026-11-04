@@ -322,7 +322,7 @@ public class VehicleActuator {
      */
     public static void dismissConsentScreen(int userType) {
         RootBridge.runCommand("/system/bin/service call " + SVC_FACTORY + " " + TX_HIDE_CONSENT_SCREEN);
-        RootBridge.runCommand("/system/bin/service call " + SVC_NOTIFICATION + " " + TX_NOTIFY_CONSENT_CHANGED + " i32 1 i32 " + userType);
+        RootBridge.runCommand("/system/bin/service call " + SVC_NOTIFICATION + " " + TX_NOTIFY_CONSENT_CHANGED + " i32 0 i32 " + userType);
 
         IBinder factoryBinder = getService(SVC_FACTORY);
         if (factoryBinder != null) {
@@ -343,7 +343,7 @@ public class VehicleActuator {
             Parcel data = Parcel.obtain();
             Parcel reply = Parcel.obtain();
             try {
-                data.writeInt(1); // 1 = dismissed
+                data.writeInt(0); // 0 = dismissed/closed
                 data.writeInt(userType);
                 notifBinder.transact(TX_NOTIFY_CONSENT_CHANGED, data, reply, 0);
             } catch (Throwable t) {
@@ -403,7 +403,7 @@ public class VehicleActuator {
 
         // 2. Try executing unified root switch flow via helper.sh
         String subcmd = dismissNotice ? "full-flow" : "switch";
-        RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid), trigger);
+        RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid), trigger, String.valueOf(recallSeat));
         if (r.exitCode == 0) {
             Log.i(TAG, "Unified switch via RootBridge succeeded: " + r.output);
             AppLogger.i(TAG, "Unified switch succeeded: " + r.output);
@@ -426,6 +426,11 @@ public class VehicleActuator {
             showOemToast(context, msg);
         }
 
+        RootBridge.runCommand("mkdir -p /data/nemesis/apps/hmg-phone-profiles/data 2>/dev/null; " +
+            "now=$(date +%s 2>/dev/null || echo 0); " +
+            "echo $now > /data/nemesis/apps/hmg-phone-profiles/data/last_switched_ts 2>/dev/null; " +
+            "echo $now > /data/local/tmp/hmg_phone_profiles_last_switched_ts 2>/dev/null; " +
+            "echo $now > /data/local/tmp/last_switched_ts 2>/dev/null || true");
         return true;
     }
 }

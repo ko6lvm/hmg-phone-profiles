@@ -55,8 +55,15 @@ public class PhoneFingerprintManager {
                 if (tokens.length >= 4) {
                     String flags = tokens[2];
                     String mac = tokens[3].toUpperCase();
-                    // 0x2 flag indicates completed/reachable ARP entry
-                    if ("0x2".equalsIgnoreCase(flags) && MAC_PATTERN.matcher(mac).matches()) {
+                    boolean isWifi = true;
+                    if (tokens.length >= 6) {
+                        String dev = tokens[5].toLowerCase();
+                        isWifi = dev.startsWith("wlan") || dev.startsWith("ap") ||
+                                 dev.startsWith("softap") || dev.startsWith("p2p") ||
+                                 dev.startsWith("wifi");
+                    }
+                    // 0x2 flag indicates completed/reachable ARP entry on Wi-Fi interface
+                    if (isWifi && "0x2".equalsIgnoreCase(flags) && MAC_PATTERN.matcher(mac).matches()) {
                         if (!"00:00:00:00:00:00".equals(mac)) {
                             stations.add(mac);
                         }
@@ -114,6 +121,18 @@ public class PhoneFingerprintManager {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Checks if a device name is a generic placeholder (e.g. Connected Phone, CarPlay Phone).
+     */
+    public static boolean isGenericPlaceholderName(String name) {
+        if (name == null || name.trim().isEmpty()) return true;
+        String n = name.trim().toLowerCase();
+        return n.equals("connected phone") ||
+               n.equals("carplay phone") ||
+               n.equals("paired device") ||
+               n.startsWith("paired phone");
     }
 
     /**
@@ -260,39 +279,73 @@ public class PhoneFingerprintManager {
             }
         }
 
-        if (matchedPhones.isEmpty()) {
+        List<ProfileConfig.PhoneItem> driverMatched = new ArrayList<ProfileConfig.PhoneItem>();
+        for (ProfileConfig.PhoneItem phone : matchedPhones) {
+            if (phone.assignedDriver > 0) {
+                driverMatched.add(phone);
+            }
+        }
+
+        if (driverMatched.isEmpty()) {
             result.matchedDriver = 0;
             result.matchedPhoneName = null;
             return result;
         }
 
-        if (matchedPhones.size() == 1) {
-            ProfileConfig.PhoneItem single = matchedPhones.get(0);
+        if (driverMatched.size() == 1) {
+            ProfileConfig.PhoneItem single = driverMatched.get(0);
             result.matchedDriver = single.assignedDriver;
             result.matchedPhoneName = single.name;
             return result;
         }
 
-        // Conflict Resolution (Multiple phones matched)
+        // Conflict Resolution (Multiple driver phones matched)
         String policy = config.conflictPolicy;
         if ("tcp".equalsIgnoreCase(policy)) {
             // Whichever has active projection wins
             if (result.hasActiveProjection) {
-                // Prefer Driver 1 if active
-                result.matchedDriver = 1;
-                result.matchedPhoneName = "Priority Projection";
-            } else {
-                result.matchedDriver = 1;
-                result.matchedPhoneName = "Driver 1";
+                ProfileConfig.PhoneItem projWinner = null;
+                String projMac = null;
+                try {
+                    String raw = VehicleActuator.execServiceCall("phoneprojection", 5);
+                    String decoded = decodeParcelString(raw);
+                    Matcher m = MAC_PATTERN.matcher(decoded);
+                    if (m.find()) {
+                        projMac = m.group().toUpperCase();
+                    }
+                } catch (Throwable ignored) {}
+                if (projMac != null) {
+                    for (ProfileConfig.PhoneItem item : driverMatched) {
+                        if (item.btMac != null && item.btMac.equalsIgnoreCase(projMac)) {
+                            projWinner = item;
+                            break;
+                        }
+                    }
+                }
+                if (projWinner != null) {
+                    result.matchedDriver = projWinner.assignedDriver;
+                    result.matchedPhoneName = projWinner.name;
+                    return result;
+                }
             }
-        } else if ("manual".equalsIgnoreCase(policy)) {
-            // Keep current driver
-            result.matchedDriver = (currentDriver > 0) ? currentDriver : 1;
-            result.matchedPhoneName = "Manual / Current";
-        } else {
-            // Default "p1": Priority #1 wins
+
+            // If no active projection winner, keep current driver if matched
+            ProfileConfig.PhoneItem currentPhone = null;
+            for (ProfileConfig.PhoneItem item : driverMatched) {
+                if (item.assignedDriver == currentDriver) {
+                    currentPhone = item;
+                    break;
+                }
+            }
+            if (currentPhone != null) {
+                result.matchedDriver = currentDriver;
+                result.matchedPhoneName = currentPhone.name;
+                return result;
+            }
+
+            // Otherwise fall back to p1 (lowest priority number)
             ProfileConfig.PhoneItem highest = null;
-            for (ProfileConfig.PhoneItem item : matchedPhones) {
+            for (ProfileConfig.PhoneItem item : driverMatched) {
                 if (highest == null || (item.priority > 0 && item.priority < highest.priority)) {
                     highest = item;
                 }
@@ -301,8 +354,51 @@ public class PhoneFingerprintManager {
                 result.matchedDriver = highest.assignedDriver;
                 result.matchedPhoneName = highest.name;
             } else {
-                result.matchedDriver = 1;
-                result.matchedPhoneName = "Driver 1";
+                result.matchedDriver = driverMatched.get(0).assignedDriver;
+                result.matchedPhoneName = driverMatched.get(0).name;
+            }
+        } else if ("manual".equalsIgnoreCase(policy)) {
+            // Keep current driver if current is one of the candidates
+            ProfileConfig.PhoneItem currentPhone = null;
+            for (ProfileConfig.PhoneItem item : driverMatched) {
+                if (item.assignedDriver == currentDriver) {
+                    currentPhone = item;
+                    break;
+                }
+            }
+            if (currentPhone != null) {
+                result.matchedDriver = currentDriver;
+                result.matchedPhoneName = currentPhone.name;
+            } else {
+                // Current driver not in candidates, fall back to p1
+                ProfileConfig.PhoneItem highest = null;
+                for (ProfileConfig.PhoneItem item : driverMatched) {
+                    if (highest == null || (item.priority > 0 && item.priority < highest.priority)) {
+                        highest = item;
+                    }
+                }
+                if (highest != null) {
+                    result.matchedDriver = highest.assignedDriver;
+                    result.matchedPhoneName = highest.name;
+                } else {
+                    result.matchedDriver = driverMatched.get(0).assignedDriver;
+                    result.matchedPhoneName = driverMatched.get(0).name;
+                }
+            }
+        } else {
+            // Default "p1": Priority #1 wins
+            ProfileConfig.PhoneItem highest = null;
+            for (ProfileConfig.PhoneItem item : driverMatched) {
+                if (highest == null || (item.priority > 0 && item.priority < highest.priority)) {
+                    highest = item;
+                }
+            }
+            if (highest != null) {
+                result.matchedDriver = highest.assignedDriver;
+                result.matchedPhoneName = highest.name;
+            } else {
+                result.matchedDriver = driverMatched.get(0).assignedDriver;
+                result.matchedPhoneName = driverMatched.get(0).name;
             }
         }
 
@@ -401,13 +497,21 @@ public class PhoneFingerprintManager {
             }
 
             // Merge each discovered phone
-            int nextId = config.phones.size() + 1;
+            int maxId = 0;
+            for (ProfileConfig.PhoneItem p : config.phones) {
+                if (p.id > maxId) maxId = p.id;
+            }
+            int nextId = maxId + 1;
             for (ProfileConfig.PhoneItem disc : discovered) {
                 ProfileConfig.PhoneItem existing = config.findPhoneByBtMac(disc.btMac);
                 if (existing != null) {
-                    // Update name if it changed
+                    // Update name if disc.name is valid and does not clobber a valid name with a placeholder
                     if (disc.name != null && !disc.name.isEmpty()) {
-                        existing.name = disc.name;
+                        boolean isNewPlaceholder = isGenericPlaceholderName(disc.name);
+                        boolean isExistingPlaceholder = isGenericPlaceholderName(existing.name);
+                        if (!isNewPlaceholder || isExistingPlaceholder) {
+                            existing.name = disc.name;
+                        }
                     }
                 } else {
                     // Determine initial driver assignment if free
@@ -432,17 +536,6 @@ public class PhoneFingerprintManager {
                     disc.assignedDriver = assign;
                     disc.priority = prio;
                     config.phones.add(disc);
-                }
-            }
-
-            // Auto-map Wi-Fi stations if present in ARP
-            Set<String> arpStations = readArpStations();
-            if (!arpStations.isEmpty()) {
-                for (ProfileConfig.PhoneItem p : config.phones) {
-                    if (p.wifiMac == null && p.assignedDriver == 1) {
-                        p.wifiMac = arpStations.iterator().next();
-                        break;
-                    }
                 }
             }
 

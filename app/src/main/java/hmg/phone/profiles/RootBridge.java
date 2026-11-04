@@ -80,7 +80,13 @@ public class RootBridge {
         sb.append(helper).append(" ").append(subcmd);
         if (args != null) {
             for (String arg : args) {
-                sb.append(" ").append(arg);
+                if (arg != null) {
+                    if (arg.contains(" ") || arg.contains("\"") || arg.isEmpty()) {
+                        sb.append(" \"").append(arg.replace("\"", "\\\"")).append("\"");
+                    } else {
+                        sb.append(" ").append(arg);
+                    }
+                }
             }
         }
         return runCommand(sb.toString());

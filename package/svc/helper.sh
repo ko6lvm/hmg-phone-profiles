@@ -160,6 +160,18 @@ execute_switch_flow() {
     dismiss_notice="${2:-false}"
     show_toast="${3:-true}"
     trigger_source="${4:-Manual}"
+    recall_door_seat="${5:-}"
+
+    # If recall_door_seat not explicitly passed, inspect config.json
+    if [ -z "$recall_door_seat" ]; then
+        cfg=$(sync_and_get_config_path)
+        if [ -n "$cfg" ] && [ -f "$cfg" ] && grep -q '"recall_door_seat":[ \t]*true' "$cfg" 2>/dev/null; then
+            recall_door_seat="true"
+        else
+            recall_door_seat="false"
+        fi
+    fi
+
     target_name=$(get_profile_name "$target_uid")
 
     log_info "[ACTION] Requesting profile switch to Driver $target_uid ($target_name) via $trigger_source..."
@@ -182,15 +194,15 @@ execute_switch_flow() {
     # 2. Update Pre-boot Profile for Next Ignition Cycle (Tx 44)
     service call com.hkmc.userprofile 44 i32 "$target_uid" >/dev/null 2>&1 || true
 
-    # 3. Dismiss Startup Consent Screen if enabled
+    # 3. Dismiss Startup Consent Screen if enabled (0 = closed/dismissed)
     if [ "$dismiss_notice" = "true" ]; then
         log_info "[STEP 2] Dismissing ConsentScreen (factory Tx 82 & notification Tx 24)..."
         service call com.hkmc.factory 82 >/dev/null 2>&1 || true
-        service call notification 24 i32 1 i32 "$target_uid" >/dev/null 2>&1 || true
+        service call notification 24 i32 0 i32 "$target_uid" >/dev/null 2>&1 || true
     fi
 
-    # 4. Recall Physical Door Memory Button (after 1.0s delay to override stock USM)
-    if [ "$target_uid" = "1" ] || [ "$target_uid" = "2" ]; then
+    # 4. Recall Physical Door Memory Button (after 1.0s delay if configured, avoiding USM conflict)
+    if [ "$recall_door_seat" = "true" ] && { [ "$target_uid" = "1" ] || [ "$target_uid" = "2" ]; }; then
         sleep 1
         # PBACK_P1 = 4, PBACK_P2 = 5 (IVRService.set_AVNIMSButton_Cmd_AVN [Tx 14])
         cmd=$((target_uid + 3))
@@ -210,6 +222,8 @@ execute_switch_flow() {
     mkdir -p "$DATA_DIR" 2>/dev/null || true
     echo "$target_uid" > "$DATA_DIR/last_switched_uid" 2>/dev/null || true
     date +%s > "$DATA_DIR/last_switched_ts" 2>/dev/null || true
+    date +%s > "/data/local/tmp/hmg_phone_profiles_last_switched_ts" 2>/dev/null || true
+    date +%s > "/data/local/tmp/last_switched_ts" 2>/dev/null || true
 
     log_info "[SUCCESS] Profile switch to Driver $target_uid completed in Park."
     return 0
@@ -270,8 +284,8 @@ get_connected_bt_macs() {
 
 get_connected_wifi_macs() {
     if [ -f /proc/net/arp ]; then
-        # Parse station MACs with Flag 0x2 (completed ARP entry)
-        awk '$3 == "0x2" {
+        # Parse station MACs with Flag 0x2 (completed ARP entry) on Wi-Fi interfaces
+        awk '$3 == "0x2" && (NF < 6 || tolower($6) ~ /^(wlan|ap|softap|p2p|wifi)/) {
             mac = toupper($4)
             if (mac != "00:00:00:00:00:00" && mac ~ /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/) {
                 print mac
@@ -291,30 +305,7 @@ has_active_projection_tcp() {
 }
 
 get_bonded_devices() {
-    # 1. Connected Device Name & BT MAC from phoneprojection
-    raw_p4=$(service call phoneprojection 4 2>/dev/null || true)
-    name_p4=$(decode_parcel_str "$raw_p4")
-    raw_p5=$(service call phoneprojection 5 2>/dev/null || true)
-    mac_p5=$(decode_parcel_str "$raw_p5" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
-    if [ -n "$mac_p5" ] && [ -n "$name_p4" ] && [ "$name_p4" != "<null>" ] && [ "$name_p4" != "<empty>" ]; then
-        echo "$name_p4|$mac_p5"
-    fi
-
-    # 2. Connected HFP Phone from bluetooth_manager
-    raw_b17=$(service call bluetooth_manager 17 2>/dev/null || true)
-    mac_b17=$(decode_parcel_str "$raw_b17" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
-    if [ -n "$mac_b17" ] && [ "$mac_b17" != "$mac_p5" ]; then
-        echo "Connected Phone|$mac_b17"
-    fi
-
-    # 3. Last CarPlay phone from dipo
-    raw_d14=$(service call dipo 14 2>/dev/null || true)
-    mac_d14=$(decode_parcel_str "$raw_d14" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
-    if [ -n "$mac_d14" ]; then
-        echo "CarPlay Phone|$mac_d14"
-    fi
-
-    # 4. Parse persistent Bluetooth config (Bluedroid XML & Conf) - covers ALL user profiles
+    # 1. Parse persistent Bluetooth config (Bluedroid XML & Conf) - covers ALL user profiles
     for bt_xml in /data/misc/bluedroid/bt_config.xml /data/misc/bluetoothd/bt_config.xml; do
         if [ -f "$bt_xml" ]; then
             awk '
@@ -351,7 +342,86 @@ get_bonded_devices() {
         fi
     done
 
-    # 5. HKMC Bluetooth Settings shared_prefs across all user profiles (0, 10, 1, 2)
+    # 2. HKMC UserProfile per-profile device storage across user 1 and user 2
+    for up_xml in /data/data/com.hkmc.system.app.userprofile/shared_prefs/*.xml \
+                  /data/user/*/com.hkmc.system.app.userprofile/shared_prefs/*.xml \
+                  /securedata/com.hkmc.system.app.userprofile/shared_prefs/*.xml; do
+        if [ -f "$up_xml" ]; then
+            awk '
+            /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/ {
+                line = $0
+                match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)
+                mac = toupper(substr(line, RSTART, RLENGTH))
+                if (match(line, />[^<]+</)) {
+                    val = substr(line, RSTART + 1, RLENGTH - 2)
+                    if (toupper(val) != mac && length(val) > 0) {
+                        print val "|" mac
+                        last_mac = ""
+                        next
+                    }
+                }
+                if (match(line, /name="([^"]+)"/)) {
+                    attr = substr(line, RSTART + 6, RLENGTH - 7)
+                    if (toupper(attr) != mac && tolower(attr) !~ /(mac|addr|address|^bt_|^selected_|^device_|[0-9_]+$)/) {
+                        print attr "|" mac
+                        last_mac = ""
+                        next
+                    }
+                }
+                last_mac = mac
+                last_mac_line = NR
+            }
+            tolower($0) ~ /name="[^"]*(name|device|title|alias)[^"]*"/ && />[^<]+</ {
+                match($0, />[^<]+</)
+                if (RLENGTH > 2) {
+                    cname = substr($0, RSTART + 1, RLENGTH - 2)
+                    if (last_mac != "" && (NR - last_mac_line <= 4) && cname != "" && toupper(cname) != last_mac) {
+                        print cname "|" last_mac
+                        last_mac = ""
+                        last_mac_line = 0
+                    }
+                }
+            }
+            ' "$up_xml" 2>/dev/null || true
+        fi
+    done
+
+    # 3. HKMC UserProfile SQLite databases (UserProfileSettingDB.db)
+    for up_db in /securedata/com.hkmc.system.app.userprofile/databases/*.db \
+                 /data/data/com.hkmc.system.app.userprofile/databases/*.db; do
+        if [ -f "$up_db" ]; then
+            if type sqlite3 >/dev/null 2>&1; then
+                tbls=$(sqlite3 "$up_db" "SELECT tbl_name FROM sqlite_master WHERE type='table';" 2>/dev/null || true)
+                for tbl in $tbls; do
+                    sqlite3 "$up_db" "SELECT * FROM $tbl;" 2>/dev/null | awk -F'|' '
+                    {
+                        for (i = 1; i <= NF; i++) {
+                            if ($i ~ /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/) {
+                                mac = toupper($i)
+                                for (j = 1; j <= NF; j++) {
+                                    if (j != i && length($j) > 1 && $j !~ /^[0-9]+$/ && $j !~ /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/) {
+                                        print $j "|" mac
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }' 2>/dev/null || true
+                done
+            fi
+            tr -cd '[:print:]\n' < "$up_db" 2>/dev/null | awk '
+            {
+                line = $0
+                while (match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)) {
+                    mac = toupper(substr(line, RSTART, RLENGTH))
+                    print "Paired Phone|" mac
+                    line = substr(line, RSTART + RLENGTH)
+                }
+            }' 2>/dev/null || true
+        fi
+    done
+
+    # 4. HKMC Bluetooth Settings shared_prefs across all user profiles (0, 10, 1, 2)
     for sp in /data/data/com.android.btsettings/shared_prefs/*.xml /data/user/*/com.android.btsettings/shared_prefs/*.xml /data/system/users/*/com.android.btsettings*.xml; do
         if [ -f "$sp" ]; then
             awk '
@@ -367,6 +437,15 @@ get_bonded_devices() {
             ' "$sp" 2>/dev/null || true
         fi
     done
+
+    # 5. Connected Device Name & BT MAC from phoneprojection (if actively connected)
+    raw_p4=$(service call phoneprojection 4 2>/dev/null || true)
+    name_p4=$(decode_parcel_str "$raw_p4")
+    raw_p5=$(service call phoneprojection 5 2>/dev/null || true)
+    mac_p5=$(decode_parcel_str "$raw_p5" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_p5" ] && [ -n "$name_p4" ] && [ "$name_p4" != "<null>" ] && [ "$name_p4" != "<empty>" ]; then
+        echo "$name_p4|$mac_p5"
+    fi
 
     # 6. Dumpsys bluetooth / bluetooth_manager for bonded devices across profiles
     dump=$(dumpsys bluetooth 2>/dev/null || dumpsys bluetooth_manager 2>/dev/null || true)
@@ -391,6 +470,20 @@ get_bonded_devices() {
                 print name "|" mac
             }
         }'
+    fi
+
+    # 7. Fallback: Connected HFP Phone from bluetooth_manager
+    raw_b17=$(service call bluetooth_manager 17 2>/dev/null || true)
+    mac_b17=$(decode_parcel_str "$raw_b17" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_b17" ] && [ "$mac_b17" != "$mac_p5" ]; then
+        echo "Connected Phone|$mac_b17"
+    fi
+
+    # 8. Fallback: Last CarPlay phone from dipo
+    raw_d14=$(service call dipo 14 2>/dev/null || true)
+    mac_d14=$(decode_parcel_str "$raw_d14" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_d14" ]; then
+        echo "CarPlay Phone|$mac_d14"
     fi
 }
 
@@ -527,6 +620,8 @@ run_daemon() {
     trap 'log_info "[hmg-phone-profiles] Shutting down..."; rm -f "$PID_FILE" "$FALLBACK_PID" "/data/local/tmp/autoprofile_helper.pid"; exit 0' SIGTERM SIGINT
 
     last_switched_driver=0
+    last_resolved_driver=0
+    prev_in_park="false"
 
     while true; do
         update_state_file
@@ -580,7 +675,7 @@ run_daemon() {
             if [ -n "$p_bt_upper" ] && echo " $bt_macs " | grep -q " $p_bt_upper "; then
                 is_match=true
             fi
-            if [ -n "$p_wifi_upper" ] && echo " $wifi_macs " | grep -q " $p_wifi_upper "; then
+            if [ -n "$p_wifi_upper" ] && [ "$p_wifi_upper" != "00:00:00:00:00:00" ] && echo " $wifi_macs " | grep -q " $p_wifi_upper "; then
                 is_match=true
             fi
 
@@ -616,49 +711,164 @@ EOF
             fi
         fi
 
-        # Resolution based on matched count and conflict policy
+        # Filter candidate drivers (only phones assigned to Driver > 0)
+        matched_candidate_count=0
+        candidate_drivers=""
+        candidate_priorities=""
+        candidate_names=""
+        candidate_bts=""
+
+        i=1
+        for drv in $matched_drivers; do
+            prio=$(echo "$matched_priorities" | awk -v idx="$i" '{print $idx}')
+            name=$(echo "$matched_names" | awk -F';' -v idx="$((i + 1))" '{print $idx}')
+            b_mac=$(echo "$matched_bts" | awk -v idx="$i" '{print $idx}')
+            if [ "$drv" -gt 0 ]; then
+                matched_candidate_count=$((matched_candidate_count + 1))
+                candidate_drivers="$candidate_drivers $drv"
+                candidate_priorities="$candidate_priorities $prio"
+                candidate_names="$candidate_names;$name"
+                candidate_bts="$candidate_bts $b_mac"
+            fi
+            i=$((i + 1))
+        done
+
         resolved_driver=0
+        winning_phone_name=""
         current_uid=$(get_active_profile)
 
-        if [ "$matched_count" -eq 0 ]; then
+        if [ "$matched_candidate_count" -eq 0 ]; then
             resolved_driver=0
-        elif [ "$matched_count" -eq 1 ]; then
-            resolved_driver=$(echo "$matched_drivers" | awk '{print $1}')
+            winning_phone_name=""
+        elif [ "$matched_candidate_count" -eq 1 ]; then
+            resolved_driver=$(echo "$candidate_drivers" | awk '{print $1}')
+            winning_phone_name=$(echo "$candidate_names" | awk -F';' '{print $2}')
         else
-            # Multiple phones matched: Apply conflict policy
+            # Multiple candidate driver phones matched: Apply conflict policy
             if [ "$conflict_policy" = "tcp" ]; then
                 if has_active_projection_tcp; then
-                    resolved_driver=1
-                else
-                    resolved_driver=1
+                    raw_p5=$(service call phoneprojection 5 2>/dev/null || true)
+                    proj_mac=$(decode_parcel_str "$raw_p5" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+                    proj_driver=0
+                    i=1
+                    for drv in $candidate_drivers; do
+                        b_mac=$(echo "$candidate_bts" | awk -v idx="$i" '{print $idx}')
+                        if [ -n "$proj_mac" ] && [ "$proj_mac" = "$b_mac" ]; then
+                            proj_driver=$drv
+                            winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((i + 1))" '{print $idx}')
+                            break
+                        fi
+                        i=$((i + 1))
+                    done
+                    if [ "$proj_driver" -gt 0 ]; then
+                        resolved_driver=$proj_driver
+                    fi
                 fi
+
+                # If no projection winner resolved yet, keep current_uid if in candidates
+                if [ "$resolved_driver" -eq 0 ]; then
+                    i=1
+                    for drv in $candidate_drivers; do
+                        if [ "$drv" -eq "$current_uid" ]; then
+                            resolved_driver=$current_uid
+                            winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((i + 1))" '{print $idx}')
+                            break
+                        fi
+                        i=$((i + 1))
+                    done
+                fi
+
+                # If still not resolved, fall back to best priority (p1)
+                if [ "$resolved_driver" -eq 0 ]; then
+                    best_prio=999
+                    best_driver=0
+                    best_idx=0
+                    i=1
+                    for drv in $candidate_drivers; do
+                        prio=$(echo "$candidate_priorities" | awk -v idx="$i" '{print $idx}')
+                        if [ "$prio" -gt 0 ] && [ "$prio" -lt "$best_prio" ]; then
+                            best_prio=$prio
+                            best_driver=$drv
+                            best_idx=$i
+                        fi
+                        i=$((i + 1))
+                    done
+                    if [ "$best_prio" -lt 999 ]; then
+                        resolved_driver=$best_driver
+                        winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((best_idx + 1))" '{print $idx}')
+                    fi
+                fi
+
             elif [ "$conflict_policy" = "manual" ]; then
-                resolved_driver=$current_uid
-            else
-                # Default "p1": lowest positive priority number wins
-                best_prio=999
-                best_driver=1
+                # Keep current driver if current is one of the candidates
                 i=1
-                for drv in $matched_drivers; do
-                    prio=$(echo "$matched_priorities" | awk -v idx="$i" '{print $idx}')
-                    if [ "$prio" -gt 0 ] && [ "$prio" -lt "$best_prio" ]; then
-                        best_prio=$prio
-                        best_driver=$drv
+                for drv in $candidate_drivers; do
+                    if [ "$drv" -eq "$current_uid" ]; then
+                        resolved_driver=$current_uid
+                        winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((i + 1))" '{print $idx}')
+                        break
                     fi
                     i=$((i + 1))
                 done
-                resolved_driver=$best_driver
+
+                # If current_uid is not one of candidate drivers, fall back to best priority
+                if [ "$resolved_driver" -eq 0 ]; then
+                    best_prio=999
+                    best_driver=0
+                    best_idx=0
+                    i=1
+                    for drv in $candidate_drivers; do
+                        prio=$(echo "$candidate_priorities" | awk -v idx="$i" '{print $idx}')
+                        if [ "$prio" -gt 0 ] && [ "$prio" -lt "$best_prio" ]; then
+                            best_prio=$prio
+                            best_driver=$drv
+                            best_idx=$i
+                        fi
+                        i=$((i + 1))
+                    done
+                    if [ "$best_prio" -lt 999 ]; then
+                        resolved_driver=$best_driver
+                        winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((best_idx + 1))" '{print $idx}')
+                    fi
+                fi
+
+            else
+                # Default "p1": lowest positive priority number wins
+                best_prio=999
+                best_driver=0
+                best_idx=0
+                i=1
+                for drv in $candidate_drivers; do
+                    prio=$(echo "$candidate_priorities" | awk -v idx="$i" '{print $idx}')
+                    if [ "$prio" -gt 0 ] && [ "$prio" -lt "$best_prio" ]; then
+                        best_prio=$prio
+                        best_driver=$drv
+                        best_idx=$i
+                    fi
+                    i=$((i + 1))
+                done
+                if [ "$best_prio" -lt 999 ]; then
+                    resolved_driver=$best_driver
+                    winning_phone_name=$(echo "$candidate_names" | awk -F';' -v idx="$((best_idx + 1))" '{print $idx}')
+                fi
             fi
         fi
+        [ -z "$winning_phone_name" ] && winning_phone_name="$m_first_name"
+        [ -z "$winning_phone_name" ] && winning_phone_name="Phone"
 
         in_p=false
         if is_in_park; then in_p=true; fi
 
         # Manual switch cooldown check (suppress auto-revert within 60s of manual switch)
         last_manual_ts=0
-        if [ -f "$DATA_DIR/last_switched_ts" ]; then
-            last_manual_ts=$(cat "$DATA_DIR/last_switched_ts" 2>/dev/null || echo 0)
-        fi
+        for ts_f in "$DATA_DIR/last_switched_ts" "/data/local/tmp/hmg_phone_profiles_last_switched_ts" "/data/local/tmp/last_switched_ts"; do
+            if [ -f "$ts_f" ]; then
+                ts_val=$(cat "$ts_f" 2>/dev/null || echo 0)
+                if [ "$ts_val" -gt "$last_manual_ts" ]; then
+                    last_manual_ts="$ts_val"
+                fi
+            fi
+        done
         now=$(date +%s 2>/dev/null || echo 0)
         cooldown_active=false
         if [ "$now" -gt 0 ] && [ "$last_manual_ts" -gt 0 ]; then
@@ -684,17 +894,21 @@ EOF
                 fi
 
                 if [ "$should_switch" = "true" ]; then
-                    log_info "[DETECT] Phone ($m_first_name) matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
+                    log_info "[DETECT] Phone ($winning_phone_name) matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
                     if [ "$in_p" = "true" ]; then
-                        execute_switch_flow "$resolved_driver" "$dismiss_notice" "$show_banner" "$m_first_name"
+                        execute_switch_flow "$resolved_driver" "$dismiss_notice" "$show_banner" "$winning_phone_name"
+                        last_resolved_driver="$resolved_driver"
                     else
                         log_info "[GATE] Mutating action deferred: Gear is not in Park (P)."
                     fi
                 fi
+            else
+                last_resolved_driver="$resolved_driver"
             fi
+        else
+            last_resolved_driver="$resolved_driver"
         fi
 
-        last_resolved_driver="$resolved_driver"
         prev_in_park="$in_p"
 
         sleep 3
@@ -781,12 +995,65 @@ case "$cmd" in
         get_profile_name "$uid"
         ;;
     bonded)
-        get_bonded_devices | awk -F'|' '!seen[$2]++ { print $0 }'
+        get_bonded_devices | awk -F'|' '
+        function is_placeholder(n) {
+            if (n == "" || n ~ /^(Connected Phone|CarPlay Phone|Paired Phone|Paired Device)/) return 1
+            return 0
+        }
+        {
+            name = $1; mac = toupper($2)
+            sub(/^[ \t\r\n]+/, "", name); sub(/[ \t\r\n]+$/, "", name)
+            sub(/^[ \t\r\n]+/, "", mac); sub(/[ \t\r\n]+$/, "", mac)
+            if (mac == "") next
+            if (!(mac in names)) {
+                order[++count] = mac
+                names[mac] = name
+            } else if (is_placeholder(names[mac]) && !is_placeholder(name)) {
+                names[mac] = name
+            }
+        }
+        END {
+            for (i = 1; i <= count; i++) {
+                m = order[i]
+                print names[m] "|" m
+            }
+        }
+        '
         ;;
     switch)
         target="${2:-1}"
-        source_label="${3:-Manual}"
-        execute_switch_flow "$target" "false" "true" "$source_label"
+        recall_door=""
+        source_label=""
+        if [ "$#" -ge 3 ]; then
+            last_arg=$(eval echo "\$$#")
+            if [ "$last_arg" = "true" ] || [ "$last_arg" = "false" ]; then
+                recall_door="$last_arg"
+                i=3
+                limit=$(($# - 1))
+                while [ "$i" -le "$limit" ]; do
+                    arg_val=$(eval echo "\$$i")
+                    if [ -z "$source_label" ]; then
+                        source_label="$arg_val"
+                    else
+                        source_label="$source_label $arg_val"
+                    fi
+                    i=$((i + 1))
+                done
+            else
+                i=3
+                while [ "$i" -le "$#" ]; do
+                    arg_val=$(eval echo "\$$i")
+                    if [ -z "$source_label" ]; then
+                        source_label="$arg_val"
+                    else
+                        source_label="$source_label $arg_val"
+                    fi
+                    i=$((i + 1))
+                done
+            fi
+        fi
+        [ -z "$source_label" ] && source_label="Manual"
+        execute_switch_flow "$target" "false" "true" "$source_label" "$recall_door"
         ;;
     seat)
         preset="${2:-1}"
@@ -807,7 +1074,7 @@ case "$cmd" in
         [ "$uid" -lt 0 ] && uid=1
         echo "Hiding ConsentScreen (factory Tx 82 & notification Tx 24)..."
         service call com.hkmc.factory 82
-        service call notification 24 i32 1 i32 "$uid"
+        service call notification 24 i32 0 i32 "$uid"
         ;;
     toast)
         msg="${2:-Manual - Driver 1}"
@@ -827,8 +1094,38 @@ case "$cmd" in
         ;;
     full-flow)
         target="${2:-1}"
-        source_label="${3:-Manual}"
-        execute_switch_flow "$target" "true" "true" "$source_label"
+        recall_door=""
+        source_label=""
+        if [ "$#" -ge 3 ]; then
+            last_arg=$(eval echo "\$$#")
+            if [ "$last_arg" = "true" ] || [ "$last_arg" = "false" ]; then
+                recall_door="$last_arg"
+                i=3
+                limit=$(($# - 1))
+                while [ "$i" -le "$limit" ]; do
+                    arg_val=$(eval echo "\$$i")
+                    if [ -z "$source_label" ]; then
+                        source_label="$arg_val"
+                    else
+                        source_label="$source_label $arg_val"
+                    fi
+                    i=$((i + 1))
+                done
+            else
+                i=3
+                while [ "$i" -le "$#" ]; do
+                    arg_val=$(eval echo "\$$i")
+                    if [ -z "$source_label" ]; then
+                        source_label="$arg_val"
+                    else
+                        source_label="$source_label $arg_val"
+                    fi
+                    i=$((i + 1))
+                done
+            fi
+        fi
+        [ -z "$source_label" ] && source_label="Manual"
+        execute_switch_flow "$target" "true" "true" "$source_label" "$recall_door"
         ;;
     logs)
         count="${2:-100}"

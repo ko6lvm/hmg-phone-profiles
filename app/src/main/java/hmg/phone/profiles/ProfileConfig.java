@@ -48,6 +48,7 @@ public class ProfileConfig {
     public boolean autoSelect = true;
     public boolean dismissNotice = false;
     public boolean showBanner = true;
+    public boolean recallDoorSeat = false;
     public String conflictPolicy = "p1"; // p1 = Priority #1, tcp = Active Projection TCP, manual = Keep Current
     public int detectionWindowSec = 10;
     public final List<PhoneItem> phones = new ArrayList<PhoneItem>();
@@ -70,6 +71,7 @@ public class ProfileConfig {
         autoSelect = true;
         dismissNotice = false;
         showBanner = true;
+        recallDoorSeat = false;
         conflictPolicy = "p1";
         detectionWindowSec = 10;
         phones.clear();
@@ -118,6 +120,7 @@ public class ProfileConfig {
             autoSelect = sp.getBoolean("auto_select", true);
             dismissNotice = sp.getBoolean("dismiss_notice", false);
             showBanner = sp.getBoolean("show_banner", true);
+            recallDoorSeat = sp.getBoolean("recall_door_seat", false);
             conflictPolicy = sp.getString("conflict_policy", "p1");
             detectionWindowSec = sp.getInt("detection_window_sec", 10);
         }
@@ -131,6 +134,7 @@ public class ProfileConfig {
                 autoSelect = s.optBoolean("auto_select", true);
                 dismissNotice = s.optBoolean("dismiss_notice", false);
                 showBanner = s.optBoolean("show_banner", true);
+                recallDoorSeat = s.optBoolean("recall_door_seat", false);
                 conflictPolicy = s.optString("conflict_policy", "p1");
                 detectionWindowSec = s.optInt("detection_window_sec", 10);
             }
@@ -143,6 +147,9 @@ public class ProfileConfig {
                     String name = p.optString("name", "Phone " + id);
                     String bt = p.optString("bt_mac", "");
                     String wifi = p.has("wifi_mac") && !p.isNull("wifi_mac") ? p.getString("wifi_mac") : null;
+                    if (wifi != null && (wifi.trim().isEmpty() || "null".equalsIgnoreCase(wifi.trim()))) {
+                        wifi = null;
+                    }
                     int driver = p.optInt("assigned_driver", 0);
                     int prio = p.optInt("priority", 0);
                     phones.add(new PhoneItem(id, name, bt, wifi, driver, prio));
@@ -161,6 +168,7 @@ public class ProfileConfig {
                 .putBoolean("auto_select", autoSelect)
                 .putBoolean("dismiss_notice", dismissNotice)
                 .putBoolean("show_banner", showBanner)
+                .putBoolean("recall_door_seat", recallDoorSeat)
                 .putString("conflict_policy", conflictPolicy)
                 .putInt("detection_window_sec", detectionWindowSec)
                 .apply();
@@ -175,6 +183,7 @@ public class ProfileConfig {
             s.put("auto_select", autoSelect);
             s.put("dismiss_notice", dismissNotice);
             s.put("show_banner", showBanner);
+            s.put("recall_door_seat", recallDoorSeat);
             s.put("conflict_policy", conflictPolicy);
             s.put("detection_window_sec", detectionWindowSec);
             root.put("settings", s);

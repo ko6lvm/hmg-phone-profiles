@@ -209,23 +209,23 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Phone row clicks -> Open Assign modal
+        // Phone row clicks -> Open Assign modal by list index
         mRowPhone1.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openAssignDialog(1);
+                openAssignDialogForIndex(0);
             }
         });
         mRowPhone2.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openAssignDialog(2);
+                openAssignDialogForIndex(1);
             }
         });
         mRowPhone3.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openAssignDialog(3);
+                openAssignDialogForIndex(2);
             }
         });
 
@@ -499,6 +499,10 @@ public class MainActivity extends Activity {
                         badges[i].setText("Active (BT)");
                         badges[i].setBackgroundResource(R.drawable.badge_active);
                         badges[i].setTextColor(getResources().getColor(R.color.accent_green));
+                    } else if (wifiConn) {
+                        badges[i].setText("Active (Wi-Fi)");
+                        badges[i].setBackgroundResource(R.drawable.badge_active);
+                        badges[i].setTextColor(getResources().getColor(R.color.accent_green));
                     } else {
                         badges[i].setText("Paired");
                         badges[i].setBackgroundResource(R.drawable.badge_paired);
@@ -525,6 +529,17 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void openAssignDialogForIndex(int rowIndex) {
+        if (mConfig.phones != null && rowIndex >= 0 && rowIndex < mConfig.phones.size()) {
+            ProfileConfig.PhoneItem phone = mConfig.phones.get(rowIndex);
+            mSelectedPhoneId = phone.id;
+            mAssignDialogTitle.setText("Assign: " + phone.name);
+            String wifiStr = phone.wifiMac != null ? phone.wifiMac : "Unmapped";
+            mAssignDialogMeta.setText("BT: " + phone.btMac + " · Wi-Fi: " + wifiStr);
+            mModalAssign.setVisibility(View.VISIBLE);
+        }
+    }
+
     private void openAssignDialog(int phoneId) {
         mSelectedPhoneId = phoneId;
         ProfileConfig.PhoneItem phone = mConfig.findPhoneById(phoneId);
@@ -539,6 +554,15 @@ public class MainActivity extends Activity {
     private void applyPhoneAssignment(int phoneId, int driverId) {
         ProfileConfig.PhoneItem phone = mConfig.findPhoneById(phoneId);
         if (phone != null) {
+            // Resolve conflicts: clear driver assignment from any other phone previously assigned to this driver
+            if (driverId > 0) {
+                for (ProfileConfig.PhoneItem other : mConfig.phones) {
+                    if (other.id != phone.id && other.assignedDriver == driverId) {
+                        other.assignedDriver = 0;
+                        other.priority = 0;
+                    }
+                }
+            }
             phone.assignedDriver = driverId;
             phone.priority = driverId;
             mConfig.save(this);
@@ -560,7 +584,7 @@ public class MainActivity extends Activity {
                     MainActivity.this,
                     targetDriver,
                     mConfig.dismissNotice,
-                    true,
+                    mConfig.recallDoorSeat,
                     mConfig.showBanner,
                     "Manual"
                 );
