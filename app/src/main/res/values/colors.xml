@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_main">#1a1d1e</color>
+    <color name="card_bg">#222628</color>
+    <color name="card_alt">#1c2022</color>
+    <color name="panel_bg">#181c1e</color>
+    <color name="border">#32383b</color>
+    <color name="border_light">#444c52</color>
+    <color name="text_title">#7e959c</color>
+    <color name="text_title_bright">#a2bcc3</color>
+    <color name="text_primary">#e6ebed</color>
+    <color name="text_secondary">#8c9ba0</color>
+    <color name="text_muted">#5e6b70</color>
+    <color name="accent_green">#56d364</color>
+    <color name="accent_green_bg">#263f2b</color>
+    <color name="accent_blue">#58a6ff</color>
+    <color name="accent_blue_bg">#1d334d</color>
+    <color name="accent_amber">#e3b341</color>
+    <color name="accent_amber_bg">#3f351d</color>
+    <color name="pill_bg">#141719</color>
+    <color name="pill_active">#252b2f</color>
+    <color name="white">#ffffff</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="scrim_bg">#cc000000</color>
+</resources>

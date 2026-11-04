@@ -1,0 +1,8 @@
+# Build artifacts
+build/
+*.pyc
+__pycache__/
+
+# Scratch / plans
+PLAN.md
+*.plan

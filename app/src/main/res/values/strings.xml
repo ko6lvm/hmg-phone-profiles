@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Auto Profile Selector</string>
+    <string name="nemesis_badge">NEMESIS • 260507</string>
+    
+    <!-- Status -->
+    <string name="daemon_running">● Daemon: RUNNING</string>
+    <string name="daemon_stopped">● Daemon: STOPPED</string>
+    <string name="gear_park">Gear: PARK (P)</string>
+    <string name="gear_drive">Gear: DRIVE / REVERSE</string>
+    <string name="active_driver_1">Active: Driver 1</string>
+    <string name="active_driver_2">Active: Driver 2</string>
+    <string name="active_guest">Active: Guest</string>
+    
+    <!-- Columns -->
+    <string name="section_paired_phones">PAIRED PHONES (Tap row to assign)</string>
+    <string name="subtitle_paired_phones">Dual BT + Auto-Learned Wi-Fi</string>
+    <string name="section_settings">SETTINGS</string>
+    <string name="subtitle_settings">KitKat Gated Policy</string>
+    
+    <!-- Settings -->
+    <string name="setting_autoselect">Auto-select profile on start (Park only)</string>
+    <string name="setting_autoselect_desc">Switches user profile automatically when a mapped phone connects in Park (P).</string>
+    <string name="setting_dismiss">Dismiss startup notice (opt-in) ⚠</string>
+    <string name="setting_dismiss_desc">Calls hideConsentScreen() in Park only. Tap to configure warning opt-in.</string>
+    <string name="setting_banner">Show banner when profile changes</string>
+    <string name="setting_banner_desc">Displays on-screen toast confirmation when profile switch triggers.</string>
+    
+    <string name="label_conflict">Both phones in car:</string>
+    <string name="label_window">Detection window:</string>
+    
+    <!-- Buttons -->
+    <string name="btn_refresh">⟳ Refresh Phones</string>
+    <string name="btn_test_d1">Test: Driver 1</string>
+    <string name="btn_test_d2">Test: Driver 2</string>
+    
+    <!-- Tip -->
+    <string name="tip_autolearn">💡 Auto-Learning: When only one paired phone is connected on Bluetooth and joins the car\'s 5 GHz hotspot, its Wi-Fi MAC is learned automatically from /proc/net/arp.</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_warning_title">Notice: Dismiss Startup Warning</string>
+    <string name="dialog_warning_body">Enabling this option calls IMicomFactoryService.hideConsentScreen() upon vehicle wake.</string>
+    <string name="dialog_warning_box">⚠ Safety Agreement: This bypasses the stock startup \"Confirm\" safety prompt automatically while parked. Ensure all drivers understand vehicle safety guidelines before enabling.</string>
+    <string name="btn_enable">Yes, Enable</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_close">Close</string>
+
+    <string name="dialog_assign_title">Assign Phone</string>
+    <string name="assign_driver1">Driver 1 (Priority #1)</string>
+    <string name="assign_driver1_desc">Primary Driver</string>
+    <string name="assign_driver2">Driver 2 (Priority #2)</string>
+    <string name="assign_driver2_desc">Secondary Driver</string>
+    <string name="assign_ignore">Do Not Assign (Ignored)</string>
+    <string name="assign_ignore_desc">Ignore phone</string>
+</resources>

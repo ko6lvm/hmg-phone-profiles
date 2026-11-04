@@ -1,0 +1,33 @@
+[nemesis]
+version=1.1
+id=autoprofile.selector
+package=autoprofile.selector
+package-name=autoprofile.selector
+name=Auto Profile Selector
+label=Auto Profile Selector
+type=application,service
+package-version=1.0.0
+author=AutoProfile Team
+short-desc=Automatic driver profile selection via phone presence.
+detailed-desc=Automatically selects driver profile and recalls seat memory based on connected Bluetooth and Wi-Fi phone fingerprint in Park (P).
+target-os=4.4.2*,260507*,any
+target_os=4.4.2*,260507*,any
+os=4.4.2*,260507*,any
+model=NE*,IONIQ5*,any
+models=NE*,IONIQ5*,any
+postinstall=scripts/post.sh
+preuninstall=scripts/preun.sh
+
+[app.0]
+kind=apk
+path=app/AutoProfile.apk
+package=autoprofile.selector
+component=autoprofile.selector/.MainActivity
+uid=root
+
+[service.0]
+name=autoprofile-daemon
+kind=sh
+path=svc/helper.sh
+uid=root
+mode=restart

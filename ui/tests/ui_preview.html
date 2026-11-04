@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Profile Selector — Gen5W (260507) UI Preview</title>
+  <style>
+    @font-face {
+      font-family: 'Hyundai Sans';
+      src: url('assets/fonts/HyundaiSans-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'Kia Cube';
+      src: url('assets/fonts/KiaCube-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    :root {
+      --hkmc-bg: #1a1d1e;
+      --hkmc-card-bg: #222628;
+      --hkmc-card-alt: #1c2022;
+      --hkmc-border: #32383b;
+      --text-title: #7e959c;
+      --text-title-bright: #a2bcc3;
+      --text-primary: #e6ebed;
+      --text-secondary: #8c9ba0;
+      --text-muted: #5e6b70;
+      --accent-green: #3fb950;
+      --accent-green-bg: rgba(63, 185, 80, 0.15);
+      --accent-amber: #e3b341;
+      --accent-blue: #58a6ff;
+      --accent-blue-bg: rgba(88, 166, 255, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: #0d1117;
+      color: var(--text-primary);
+      font-family: 'Hyundai Sans', 'Kia Cube', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 20px 40px;
+    }
+
+    /* Top Mac preview control bar */
+    .mac-control-bar {
+      width: 100%;
+      max-width: 1920px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 18px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+
+    .mac-control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mac-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mac-badge {
+      font-size: 11px;
+      background: #238636;
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .mac-badge.firmware {
+      background: #1f6feb;
+    }
+
+    .btn-group {
+      display: flex;
+      background: #21262d;
+      border-radius: 6px;
+      padding: 2px;
+      border: 1px solid #30363d;
+    }
+
+    .mac-btn {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mac-btn:hover {
+      color: #f0f6fc;
+      background: #30363d;
+    }
+
+    .mac-btn.active {
+      color: #ffffff;
+      background: #1f6feb;
+    }
+
+    .mac-action-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mac-action-btn:hover {
+      background: #30363d;
+      color: #fff;
+    }
+
+    .mac-action-btn.active-state {
+      border-color: #3fb950;
+      color: #3fb950;
+    }
+
+    /* Screen container wrapper */
+    .viewport-wrapper {
+      position: relative;
+      background: #000;
+      border: 2px solid #30363d;
+      border-radius: 6px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      overflow: hidden;
+      transition: width 0.3s ease, transform 0.3s ease;
+    }
+
+    /* Head Unit Native Canvas: 1920x720 px */
+    .headunit-screen {
+      font-family: 'Hyundai Sans', 'Kia Cube', 'Roboto', 'Noto Sans', sans-serif;
+      width: 1920px;
+      height: 720px;
+      position: relative;
+      background-color: var(--hkmc-bg);
+      background-image: url('assets/co_bg.png');
+      background-size: 1920px 720px;
+      background-repeat: no-repeat;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+
+    /* 1280 Viewport Mode */
+    .viewport-1280 .headunit-screen {
+      width: 1280px;
+      background-size: cover;
+    }
+
+    /* Title Bar (60dp -> 90px @ 1.5x) */
+    .title-bar {
+      height: 90px;
+      width: 100%;
+      background-image: url('assets/co_bg_title_bar.png');
+      background-repeat: repeat-x;
+      background-size: auto 90px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px 0 32px;
+      position: relative;
+      flex-shrink: 0;
+      border-bottom: 2px solid #23292c;
+    }
+
+    .title-bar-shadow {
+      position: absolute;
+      bottom: -9px;
+      left: 0;
+      width: 100%;
+      height: 9px;
+      background-image: url('assets/co_bg_status_shadow.png');
+      background-repeat: repeat-x;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .title-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .title-app-name {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-title-bright);
+      letter-spacing: 0.5px;
+    }
+
+    .title-credit {
+      font-size: 18px;
+      color: var(--text-title);
+      font-weight: 500;
+    }
+
+    .title-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-pills {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #141719;
+      border: 1px solid var(--hkmc-border);
+      color: var(--text-secondary);
+    }
+
+    .status-pill.online {
+      color: #56d364;
+      border-color: rgba(63, 185, 80, 0.4);
+      background: var(--accent-green-bg);
+    }
+
+    .status-pill.gear-p {
+      color: #79c0ff;
+      border-color: rgba(88, 166, 255, 0.4);
+      background: var(--accent-blue-bg);
+    }
+
+    .status-pill.active-profile {
+      color: #f0f6fc;
+      border-color: #484f58;
+      background: #252b2f;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .btn-close {
+      width: 80px;
+      height: 70px;
+      background: url('assets/co_btn_close_nor.png') no-repeat center center;
+      background-size: 56px 56px;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background-image 0.1s;
+    }
+
+    .btn-close:active {
+      background-image: url('assets/co_btn_close_push.png');
+    }
+
+    /* Main split container (540px height) */
+    .main-body {
+      flex: 1;
+      display: flex;
+      height: 540px;
+      padding: 16px 28px 12px;
+      gap: 24px;
+      overflow: hidden;
+    }
+
+    .column-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: rgba(22, 26, 28, 0.7);
+      border: 1px solid var(--hkmc-border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .panel-header {
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid var(--hkmc-border);
+      background: rgba(30, 35, 38, 0.6);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .panel-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-title-bright);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .panel-header span {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .panel-scroll-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Phone List Row Item */
+    .phone-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--hkmc-card-alt);
+      border: 1px solid #282f33;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+    }
+
+    .phone-row:hover {
+      background: #252b30;
+      border-color: #3d464c;
+    }
+
+    .phone-row.selected {
+      background: url('assets/co_btn_bg_list_sel.png') repeat-x center center;
+      background-size: cover;
+      border-color: #4a5c66;
+    }
+
+    .phone-info-left {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .phone-title-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .phone-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .badge-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-pill.active {
+      background: var(--accent-green-bg);
+      color: #56d364;
+      border: 1px solid rgba(63, 185, 80, 0.5);
+    }
+
+    .badge-pill.carplay {
+      background: var(--accent-blue-bg);
+      color: #58a6ff;
+      border: 1px solid rgba(88, 166, 255, 0.5);
+    }
+
+    .badge-pill.paired {
+      background: #262c30;
+      color: var(--text-secondary);
+      border: 1px solid #363e44;
+    }
+
+    .phone-meta-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    .phone-meta-line .dot-sep {
+      color: #485358;
+    }
+
+    .phone-meta-line .tag-learned {
+      color: #79c0ff;
+      font-weight: 600;
+    }
+
+    .phone-assign-tag {
+      font-size: 15px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: #2a3338;
+      color: #e6ebed;
+      border: 1px solid #3a454c;
+    }
+
+    .phone-assign-tag.driver1 {
+      border-color: rgba(88, 166, 255, 0.6);
+      color: #79c0ff;
+    }
+
+    .phone-assign-tag.driver2 {
+      border-color: rgba(227, 179, 65, 0.6);
+      color: #e3b341;
+    }
+
+    .phone-assign-tag.ignored {
+      color: var(--text-muted);
+      border-color: transparent;
+      background: transparent;
+    }
+
+    /* Settings Column Elements */
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+      background: var(--hkmc-card-alt);
+      border: 1px solid #282f33;
+      border-radius: 6px;
+      gap: 4px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .setting-label-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* HKMC Checkbox styling */
+    .hkmc-checkbox {
+      width: 32px;
+      height: 32px;
+      border: 2px solid #58666d;
+      border-radius: 4px;
+      background: #15181a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .hkmc-checkbox.checked {
+      background: #205c3b;
+      border-color: #3fb950;
+    }
+
+    .hkmc-checkbox.checked::after {
+      content: "";
+      width: 22px;
+      height: 22px;
+      background: url('assets/ic_check.png') no-repeat center center;
+      background-size: contain;
+    }
+
+    .setting-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .setting-title .warn-icon {
+      color: var(--accent-amber);
+      font-size: 18px;
+      margin-left: 6px;
+    }
+
+    .setting-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding-left: 44px;
+      line-height: 1.35;
+    }
+
+    /* HKMC Dropdown select */
+    .setting-select-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--hkmc-card-alt);
+      border: 1px solid #282f33;
+      border-radius: 6px;
+    }
+
+    .setting-select-label {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e6ebed;
+    }
+
+    .hkmc-select {
+      background: #141719;
+      border: 1px solid #48545b;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Bottom Action Bar (60dp -> 90px @ 1.5x) */
+    .bottom-bar {
+      height: 90px;
+      width: 100%;
+      background-image: url('assets/co_bg_bottom.png');
+      background-repeat: repeat-x;
+      background-size: auto 90px;
+      border-top: 2px solid #252b2f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 0 32px;
+      flex-shrink: 0;
+    }
+
+    .hkmc-bottom-btn {
+      min-width: 220px;
+      height: 62px;
+      background: url('assets/co_btn_title_bg_nor.png') no-repeat center center;
+      background-size: 100% 100%;
+      border: none;
+      color: #e6ebed;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: 6px;
+      transition: filter 0.1s;
+    }
+
+    .hkmc-bottom-btn:active {
+      background-image: url('assets/co_btn_title_bg_push.png');
+      color: #ffffff;
+    }
+
+    .hkmc-bottom-btn:hover {
+      filter: brightness(1.15);
+    }
+
+    /* Popups & Dialogs (Translucent Fullscreen Card) */
+    .hkmc-dialog-scrim {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .hkmc-dialog-scrim.visible {
+      display: flex;
+    }
+
+    .hkmc-dialog-card {
+      width: 760px;
+      background: var(--hkmc-bg);
+      border: 2px solid #363e44;
+      border-radius: 8px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.9);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dialog-title-bar {
+      height: 70px;
+      background: url('assets/co_bg_title_bar.png') repeat-x;
+      background-size: auto 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px 0 24px;
+      border-bottom: 2px solid #23292c;
+    }
+
+    .dialog-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-title-bright);
+    }
+
+    .dialog-body {
+      padding: 28px 32px;
+      font-size: 20px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .dialog-body .warning-box {
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: rgba(227, 179, 65, 0.1);
+      border-left: 4px solid var(--accent-amber);
+      font-size: 16px;
+      color: #e3b341;
+      border-radius: 4px;
+    }
+
+    .dialog-btn-bar {
+      height: 80px;
+      background: url('assets/co_bg_bottom.png') repeat-x;
+      background-size: auto 80px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 16px;
+      padding: 0 24px;
+      border-top: 1px solid var(--hkmc-border);
+    }
+
+    .dialog-btn {
+      min-width: 150px;
+      height: 54px;
+      background: url('assets/co_btn_title_bg_nor.png') no-repeat center center;
+      background-size: 100% 100%;
+      border: none;
+      color: #e6ebed;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .dialog-btn.confirm {
+      color: #ffffff;
+      border: 1px solid rgba(227, 179, 65, 0.4);
+    }
+
+    /* Assign Modal Options */
+    .assign-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .assign-opt-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: #202528;
+      border: 1px solid #363e44;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .assign-opt-btn:hover {
+      background: #2a3236;
+      border-color: #58a6ff;
+    }
+
+    .assign-opt-btn.selected {
+      border-color: #3fb950;
+      background: rgba(63, 185, 80, 0.12);
+    }
+
+    /* Toast Notification Banner */
+    .toast-banner {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 800px;
+      background: rgba(24, 28, 30, 0.96);
+      border: 2px solid #3fb950;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+      border-radius: 8px;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      z-index: 90;
+      transition: top 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+
+    .toast-banner.show {
+      top: 105px;
+    }
+
+    .toast-icon {
+      width: 36px;
+      height: 36px;
+      background: url('assets/ic_check.png') no-repeat center center;
+      background-size: contain;
+      flex-shrink: 0;
+    }
+
+    .toast-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toast-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #56d364;
+    }
+
+    .toast-desc {
+      font-size: 16px;
+      color: var(--text-primary);
+    }
+
+    /* Viewport Guide Lines */
+    .viewport-guides {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+    }
+
+    .viewport-guides.show {
+      display: block;
+    }
+
+    .guide-1280 {
+      position: absolute;
+      top: 0;
+      left: 320px;
+      width: 1280px;
+      height: 100%;
+      border-left: 2px dashed rgba(255, 255, 0, 0.4);
+      border-right: 2px dashed rgba(255, 255, 0, 0.4);
+    }
+
+    .guide-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #ffeb3b;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Mac Preview Toolbar -->
+  <div class="mac-control-bar">
+    <div class="mac-control-group">
+      <div class="mac-title">
+        🚗 Gen5W Display Mockup
+        <span class="mac-badge">Stage 0 Preview</span>
+        <span class="mac-badge firmware">Firmware 260507</span>
+      </div>
+    </div>
+
+    <!-- Viewport selector -->
+    <div class="mac-control-group">
+      <span style="font-size:12px; color:#8b949e;">Viewport:</span>
+      <div class="btn-group">
+        <button class="mac-btn active" id="btn-vp-1920" onclick="setViewport('1920')">1920 × 720 (Native Widescreen)</button>
+        <button class="mac-btn" id="btn-vp-1280" onclick="setViewport('1280')">1280 × 720 (Standard View)</button>
+        <button class="mac-btn" id="btn-vp-fit" onclick="setViewport('fit')">Fit Window</button>
+      </div>
+    </div>
+
+    <!-- Simulator Presets -->
+    <div class="mac-control-group">
+      <span style="font-size:12px; color:#8b949e;">Simulate:</span>
+      <button class="mac-action-btn" onclick="applyPreset('pixel')">Pixel 11 Pro XL (AA BT+Wi-Fi)</button>
+      <button class="mac-action-btn" onclick="applyPreset('iphone')">iPhone Duo (CarPlay Wi-Fi)</button>
+      <button class="mac-action-btn" onclick="applyPreset('conflict')">Both Phones (Conflict)</button>
+      <button class="mac-action-btn" onclick="applyPreset('none')">No Phones</button>
+      <button class="mac-action-btn" id="btn-toggle-gear" onclick="toggleGear()">Gear: P</button>
+    </div>
+
+    <!-- Quick Dialogs -->
+    <div class="mac-control-group">
+      <button class="mac-action-btn" onclick="toggleWarningDialog(true)">Test Warning Modal</button>
+      <button class="mac-action-btn" onclick="showToast('Profile switched to Driver 1 (Pixel 11 Pro XL detected)')">Test Banner</button>
+    </div>
+  </div>
+
+  <!-- Screen Frame Wrapper -->
+  <div class="viewport-wrapper" id="viewport-wrapper">
+    <div class="headunit-screen" id="headunit-screen">
+
+      <!-- Viewport Guides Overlay -->
+      <div class="viewport-guides" id="viewport-guides">
+        <div class="guide-1280">
+          <div class="guide-label">1280 × 720 bounds</div>
+        </div>
+      </div>
+
+      <!-- Toast Notification Banner -->
+      <div class="toast-banner" id="toast-banner">
+        <div class="toast-icon"></div>
+        <div class="toast-content">
+          <div class="toast-title">Auto Profile Selector</div>
+          <div class="toast-desc" id="toast-text">Profile switched to Driver 1 (Pixel 11 Pro XL detected)</div>
+        </div>
+      </div>
+
+      <!-- Title Bar -->
+      <header class="title-bar">
+        <div class="title-left">
+          <div class="title-app-name">Auto Profile Selector</div>
+          <div class="title-credit">NEMESIS • 260507</div>
+        </div>
+        <div class="title-right">
+          <div class="status-pills">
+            <div class="status-pill online" id="daemon-pill">
+              <span class="status-dot"></span>
+              <span>Daemon: RUNNING</span>
+            </div>
+            <div class="status-pill gear-p" id="gear-pill">
+              <span>Gear: PARK (P)</span>
+            </div>
+            <div class="status-pill active-profile" id="profile-pill">
+              <span>Active: Driver 1</span>
+            </div>
+          </div>
+          <button class="btn-close" title="Close" onclick="showToast('Package closed. Background daemon stays active.')"></button>
+        </div>
+        <div class="title-bar-shadow"></div>
+      </header>
+
+      <!-- Main Body (2 Columns) -->
+      <main class="main-body">
+
+        <!-- Left Column: Paired Phones -->
+        <section class="column-panel" style="flex: 1.15;">
+          <div class="panel-header">
+            <h2>PAIRED PHONES (Tap row to assign)</h2>
+            <span>Dual BT + Auto-Learned Wi-Fi</span>
+          </div>
+
+          <div class="panel-scroll-content">
+
+            <!-- Phone 1: Pixel 11 Pro XL (Driver 1) -->
+            <article class="phone-row selected" id="row-phone-1" onclick="openAssignModal(1)">
+              <div class="phone-info-left">
+                <div class="phone-title-line">
+                  <span class="phone-name">Pixel 11 Pro XL</span>
+                  <span class="badge-pill active" id="badge-phone-1">● BT + Wi-Fi Active</span>
+                </div>
+                <div class="phone-meta-line">
+                  <span>BT: AA:BB:CC:11:22:33</span>
+                  <span class="dot-sep">·</span>
+                  <span class="tag-learned">Wi-Fi: Learned (02:00:00:..)</span>
+                  <span class="dot-sep">·</span>
+                  <span style="color:#79c0ff; font-weight:600;">Driver 1 #1</span>
+                </div>
+              </div>
+              <div class="phone-assign-tag driver1" id="tag-phone-1">Driver 1</div>
+            </article>
+
+            <!-- Phone 2: iPhone Duo (Driver 2) -->
+            <article class="phone-row" id="row-phone-2" onclick="openAssignModal(2)">
+              <div class="phone-info-left">
+                <div class="phone-title-line">
+                  <span class="phone-name">iPhone Duo</span>
+                  <span class="badge-pill paired" id="badge-phone-2">Paired</span>
+                </div>
+                <div class="phone-meta-line">
+                  <span>BT: DD:EE:FF:44:55:66</span>
+                  <span class="dot-sep">·</span>
+                  <span class="tag-learned">Wi-Fi: Learned (02:00:00:..)</span>
+                  <span class="dot-sep">·</span>
+                  <span style="color:#e3b341; font-weight:600;">Driver 2 #2</span>
+                </div>
+              </div>
+              <div class="phone-assign-tag driver2" id="tag-phone-2">Driver 2</div>
+            </article>
+
+            <!-- Phone 3: Samsung S26 Ultra (Ignored) -->
+            <article class="phone-row" id="row-phone-3" onclick="openAssignModal(3)">
+              <div class="phone-info-left">
+                <div class="phone-title-line">
+                  <span class="phone-name">Samsung S26 Ultra</span>
+                  <span class="badge-pill paired" id="badge-phone-3">Paired</span>
+                </div>
+                <div class="phone-meta-line">
+                  <span>BT: 11:22:33:AA:BB:CC</span>
+                  <span class="dot-sep">·</span>
+                  <span>Wi-Fi: Unmapped</span>
+                  <span class="dot-sep">·</span>
+                  <span style="color:var(--text-muted);">Ignored</span>
+                </div>
+              </div>
+              <div class="phone-assign-tag ignored" id="tag-phone-3">Ignored</div>
+            </article>
+
+            <!-- Info card explaining auto-learning -->
+            <div style="margin-top:auto; padding:10px 14px; background:#181c1e; border:1px dashed #343d42; border-radius:6px; font-size:13px; color:#8c9ba0; line-height:1.4;">
+              💡 <strong>Auto-Learning:</strong> When only one paired phone is connected on Bluetooth and joins the car's 5 GHz hotspot, its Wi-Fi MAC is learned automatically from <code>/proc/net/arp</code>.
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Right Column: Settings -->
+        <section class="column-panel" style="flex: 0.85;">
+          <div class="panel-header">
+            <h2>SETTINGS</h2>
+            <span>KitKat Gated Policy</span>
+          </div>
+
+          <div class="panel-scroll-content">
+
+            <!-- Setting 1: Auto-Select -->
+            <div class="setting-item">
+              <div class="setting-row" onclick="toggleSetting('autoselect')">
+                <div class="setting-label-group">
+                  <div class="hkmc-checkbox checked" id="chk-autoselect"></div>
+                  <span class="setting-title">Auto-select profile on start (Park only)</span>
+                </div>
+              </div>
+              <div class="setting-desc">
+                Switches user profile automatically when a mapped phone connects in Park (P).
+              </div>
+            </div>
+
+            <!-- Setting 2: Dismiss Consent Notice (Opt-in) -->
+            <div class="setting-item">
+              <div class="setting-row" onclick="toggleSetting('dismissNotice')">
+                <div class="setting-label-group">
+                  <div class="hkmc-checkbox" id="chk-dismiss"></div>
+                  <span class="setting-title">Dismiss startup notice (opt-in) <span class="warn-icon">⚠</span></span>
+                </div>
+              </div>
+              <div class="setting-desc">
+                Calls <code>hideConsentScreen()</code> in Park only. Tap to configure warning opt-in.
+              </div>
+            </div>
+
+            <!-- Setting 3: Show Banner -->
+            <div class="setting-item">
+              <div class="setting-row" onclick="toggleSetting('showBanner')">
+                <div class="setting-label-group">
+                  <div class="hkmc-checkbox checked" id="chk-banner"></div>
+                  <span class="setting-title">Show banner when profile changes</span>
+                </div>
+              </div>
+              <div class="setting-desc">
+                Displays on-screen toast confirmation when profile switch triggers.
+              </div>
+            </div>
+
+            <!-- Dropdown 1: Conflict Resolution -->
+            <div class="setting-select-row">
+              <span class="setting-select-label">Both phones in car:</span>
+              <select class="hkmc-select" id="sel-conflict">
+                <option value="p1">Priority #1 Wins (Fast)</option>
+                <option value="tcp">Active Projection Wins (TCP)</option>
+                <option value="manual">Keep Current / Manual</option>
+              </select>
+            </div>
+
+            <!-- Dropdown 2: Detection Window -->
+            <div class="setting-select-row">
+              <span class="setting-select-label">Detection window:</span>
+              <select class="hkmc-select" id="sel-window">
+                <option value="10">10 seconds (Recommended)</option>
+                <option value="5">5 seconds</option>
+                <option value="15">15 seconds</option>
+              </select>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Bar -->
+      <footer class="bottom-bar">
+        <button class="hkmc-bottom-btn" onclick="refreshPhones()">
+          <span>⟳ Refresh Phones</span>
+        </button>
+        <button class="hkmc-bottom-btn" onclick="testSwitch(1)">
+          <span>Test: Driver 1</span>
+        </button>
+        <button class="hkmc-bottom-btn" onclick="testSwitch(2)">
+          <span>Test: Driver 2</span>
+        </button>
+      </footer>
+
+      <!-- Dialog 1: Warning Opt-in Dialog (dialog_alert.xml style) -->
+      <div class="hkmc-dialog-scrim" id="warning-dialog">
+        <div class="hkmc-dialog-card">
+          <div class="dialog-title-bar">
+            <span class="dialog-title">Notice: Dismiss Startup Warning</span>
+            <button class="btn-close" style="width:50px; height:50px; background-size:36px;" onclick="toggleWarningDialog(false)"></button>
+          </div>
+          <div class="dialog-body">
+            <div>
+              Enabling this option calls <code>IMicomFactoryService.hideConsentScreen()</code> upon vehicle wake.
+            </div>
+            <div class="warning-box">
+              ⚠ <strong>Safety Agreement:</strong> This bypasses the stock startup "Confirm" safety prompt automatically while parked. Ensure all drivers understand vehicle safety guidelines before enabling.
+            </div>
+          </div>
+          <div class="dialog-btn-bar">
+            <button class="dialog-btn confirm" onclick="confirmDismissOptIn(true)">Yes, Enable</button>
+            <button class="dialog-btn" onclick="toggleWarningDialog(false)">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialog 2: Assign Phone Dialog -->
+      <div class="hkmc-dialog-scrim" id="assign-dialog">
+        <div class="hkmc-dialog-card" style="width:640px;">
+          <div class="dialog-title-bar">
+            <span class="dialog-title" id="assign-dialog-title">Assign Phone</span>
+            <button class="btn-close" style="width:50px; height:50px; background-size:36px;" onclick="closeAssignModal()"></button>
+          </div>
+          <div class="dialog-body">
+            <div id="assign-dialog-meta" style="font-size:16px; color:#8c9ba0; margin-bottom:12px;"></div>
+            <div class="assign-options">
+              <button class="assign-opt-btn" id="opt-d1" onclick="assignProfile('driver1')">
+                <span>Driver 1 (Priority #1)</span>
+                <span style="font-size:14px; color:#79c0ff;">Primary Driver</span>
+              </button>
+              <button class="assign-opt-btn" id="opt-d2" onclick="assignProfile('driver2')">
+                <span>Driver 2 (Priority #2)</span>
+                <span style="font-size:14px; color:#e3b341;">Secondary Driver</span>
+              </button>
+              <button class="assign-opt-btn" id="opt-ign" onclick="assignProfile('ignored')">
+                <span>Do Not Assign (Ignored)</span>
+                <span style="font-size:14px; color:#8c9ba0;">Ignore phone</span>
+              </button>
+            </div>
+          </div>
+          <div class="dialog-btn-bar">
+            <button class="dialog-btn" onclick="closeAssignModal()">Close</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentViewport = '1920';
+    let currentGear = 'P';
+    let activeProfile = 1;
+    let dismissNoticeEnabled = false;
+    let selectedPhoneId = null;
+
+    const phoneData = {
+      1: { name: "Pixel 11 Pro XL", bt: "AA:BB:CC:11:22:33", wifi: "02:00:00:11:22:33", assign: "driver1", priority: 1 },
+      2: { name: "iPhone Duo", bt: "DD:EE:FF:44:55:66", wifi: "02:00:00:44:55:66", assign: "driver2", priority: 2 },
+      3: { name: "Samsung S26 Ultra", bt: "11:22:33:AA:BB:CC", wifi: null, assign: "ignored", priority: 0 }
+    };
+
+    function setViewport(mode) {
+      currentViewport = mode;
+      const wrapper = document.getElementById('viewport-wrapper');
+      const screen = document.getElementById('headunit-screen');
+      const guides = document.getElementById('viewport-guides');
+
+      document.getElementById('btn-vp-1920').classList.remove('active');
+      document.getElementById('btn-vp-1280').classList.remove('active');
+      document.getElementById('btn-vp-fit').classList.remove('active');
+
+      if (mode === '1920') {
+        document.getElementById('btn-vp-1920').classList.add('active');
+        wrapper.classList.remove('viewport-1280');
+        wrapper.style.transform = 'none';
+        wrapper.style.width = '1920px';
+        wrapper.style.height = '720px';
+        guides.classList.remove('show');
+      } else if (mode === '1280') {
+        document.getElementById('btn-vp-1280').classList.add('active');
+        wrapper.classList.add('viewport-1280');
+        wrapper.style.transform = 'none';
+        wrapper.style.width = '1280px';
+        wrapper.style.height = '720px';
+        guides.classList.add('show');
+      } else if (mode === 'fit') {
+        document.getElementById('btn-vp-fit').classList.add('active');
+        wrapper.classList.remove('viewport-1280');
+        const availableWidth = window.innerWidth - 40;
+        const scale = Math.min(availableWidth / 1920, 1);
+        wrapper.style.transform = `scale(${scale})`;
+        wrapper.style.transformOrigin = 'top center';
+        wrapper.style.width = '1920px';
+        wrapper.style.height = '720px';
+        guides.classList.remove('show');
+      }
+    }
+
+    function toggleGear() {
+      const btn = document.getElementById('btn-toggle-gear');
+      const pill = document.getElementById('gear-pill');
+      if (currentGear === 'P') {
+        currentGear = 'D';
+        btn.textContent = 'Gear: D (Moving)';
+        btn.classList.add('active-state');
+        pill.innerHTML = '<span>Gear: DRIVE (D)</span>';
+        pill.style.background = 'rgba(218, 54, 51, 0.2)';
+        pill.style.borderColor = 'rgba(218, 54, 51, 0.6)';
+        pill.style.color = '#f85149';
+        showToast('Vehicle shifted to Drive (D). Profile switching is locked for safety.');
+      } else {
+        currentGear = 'P';
+        btn.textContent = 'Gear: P';
+        btn.classList.remove('active-state');
+        pill.innerHTML = '<span>Gear: PARK (P)</span>';
+        pill.style.background = 'var(--accent-blue-bg)';
+        pill.style.borderColor = 'rgba(88, 166, 255, 0.4)';
+        pill.style.color = '#79c0ff';
+        showToast('Vehicle in Park (P). Profile switching is active.');
+      }
+    }
+
+    function applyPreset(preset) {
+      const b1 = document.getElementById('badge-phone-1');
+      const b2 = document.getElementById('badge-phone-2');
+      const r1 = document.getElementById('row-phone-1');
+      const r2 = document.getElementById('row-phone-2');
+
+      r1.classList.remove('selected');
+      r2.classList.remove('selected');
+
+      if (preset === 'pixel') {
+        b1.className = 'badge-pill active';
+        b1.textContent = '● BT + Wi-Fi Active';
+        b2.className = 'badge-pill paired';
+        b2.textContent = 'Paired';
+        r1.classList.add('selected');
+        setProfile(1, "Pixel 11 Pro XL (Wireless AA)");
+      } else if (preset === 'iphone') {
+        b1.className = 'badge-pill paired';
+        b1.textContent = 'Paired';
+        b2.className = 'badge-pill carplay';
+        b2.textContent = '● CarPlay Wi-Fi Active';
+        r2.classList.add('selected');
+        setProfile(2, "iPhone Duo (Wireless CarPlay)");
+      } else if (preset === 'conflict') {
+        b1.className = 'badge-pill active';
+        b1.textContent = '● BT Connected';
+        b2.className = 'badge-pill carplay';
+        b2.textContent = '● CarPlay Wi-Fi Active';
+        r1.classList.add('selected');
+        setProfile(1, "Conflict: Resolved to Priority #1 (Driver 1)");
+      } else if (preset === 'none') {
+        b1.className = 'badge-pill paired';
+        b1.textContent = 'Paired';
+        b2.className = 'badge-pill paired';
+        b2.textContent = 'Paired';
+        showToast('No mapped driver phones detected.');
+      }
+    }
+
+    function setProfile(num, reason) {
+      if (currentGear !== 'P') {
+        showToast('Cannot switch profile while in Drive (D)!');
+        return;
+      }
+      activeProfile = num;
+      document.getElementById('profile-pill').innerHTML = `<span>Active: Driver ${num}</span>`;
+      showToast(`Switched to Driver ${num} • ${reason}`);
+    }
+
+    function testSwitch(num) {
+      setProfile(num, `Manual Test`);
+    }
+
+    function toggleSetting(id) {
+      if (id === 'dismissNotice') {
+        if (!dismissNoticeEnabled) {
+          toggleWarningDialog(true);
+        } else {
+          confirmDismissOptIn(false);
+        }
+      } else if (id === 'autoselect') {
+        const el = document.getElementById('chk-autoselect');
+        el.classList.toggle('checked');
+        const checked = el.classList.contains('checked');
+        showToast(checked ? 'Auto-select enabled.' : 'Auto-select disabled.');
+      } else if (id === 'showBanner') {
+        const el = document.getElementById('chk-banner');
+        el.classList.toggle('checked');
+        const checked = el.classList.contains('checked');
+        showToast(checked ? 'Banner notifications on.' : 'Banner notifications off.');
+      }
+    }
+
+    function toggleWarningDialog(show) {
+      const dialog = document.getElementById('warning-dialog');
+      if (show) {
+        dialog.classList.add('visible');
+      } else {
+        dialog.classList.remove('visible');
+      }
+    }
+
+    function confirmDismissOptIn(enable) {
+      dismissNoticeEnabled = enable;
+      const chk = document.getElementById('chk-dismiss');
+      if (enable) {
+        chk.classList.add('checked');
+        showToast('Startup notice dismissal enabled (opt-in active).');
+      } else {
+        chk.classList.remove('checked');
+        showToast('Startup notice dismissal disabled.');
+      }
+      toggleWarningDialog(false);
+    }
+
+    function openAssignModal(phoneId) {
+      selectedPhoneId = phoneId;
+      const phone = phoneData[phoneId];
+      document.getElementById('assign-dialog-title').textContent = `Assign: ${phone.name}`;
+      document.getElementById('assign-dialog-meta').textContent = `BT: ${phone.bt} · Wi-Fi: ${phone.wifi || 'Not learned'}`;
+
+      document.getElementById('opt-d1').classList.remove('selected');
+      document.getElementById('opt-d2').classList.remove('selected');
+      document.getElementById('opt-ign').classList.remove('selected');
+
+      if (phone.assign === 'driver1') document.getElementById('opt-d1').classList.add('selected');
+      if (phone.assign === 'driver2') document.getElementById('opt-d2').classList.add('selected');
+      if (phone.assign === 'ignored') document.getElementById('opt-ign').classList.add('selected');
+
+      document.getElementById('assign-dialog').classList.add('visible');
+    }
+
+    function closeAssignModal() {
+      document.getElementById('assign-dialog').classList.remove('visible');
+      selectedPhoneId = null;
+    }
+
+    function assignProfile(role) {
+      if (!selectedPhoneId) return;
+      phoneData[selectedPhoneId].assign = role;
+      const tag = document.getElementById(`tag-phone-${selectedPhoneId}`);
+      tag.className = 'phone-assign-tag';
+
+      if (role === 'driver1') {
+        tag.classList.add('driver1');
+        tag.textContent = 'Driver 1';
+        phoneData[selectedPhoneId].priority = 1;
+      } else if (role === 'driver2') {
+        tag.classList.add('driver2');
+        tag.textContent = 'Driver 2';
+        phoneData[selectedPhoneId].priority = 2;
+      } else {
+        tag.classList.add('ignored');
+        tag.textContent = 'Ignored';
+        phoneData[selectedPhoneId].priority = 0;
+      }
+
+      closeAssignModal();
+      showToast(`Updated assignment for ${phoneData[selectedPhoneId].name}`);
+    }
+
+    let toastTimer = null;
+    function showToast(text) {
+      const banner = document.getElementById('toast-banner');
+      const bannerText = document.getElementById('toast-text');
+      bannerText.textContent = text;
+      banner.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        banner.classList.remove('show');
+      }, 3500);
+    }
+
+    function refreshPhones() {
+      showToast('Scanning Bluetooth adapter & /proc/net/arp...');
+    }
+
+    // Keyboard controls for Mac pair programming
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        toggleWarningDialog(false);
+        closeAssignModal();
+      } else if (e.key === '1') {
+        setViewport('1920');
+      } else if (e.key === '2') {
+        setViewport('1280');
+      } else if (e.key === '3') {
+        setViewport('fit');
+      }
+    });
+
+    // Auto-fit check on initial load
+    window.addEventListener('resize', () => {
+      if (currentViewport === 'fit') setViewport('fit');
+    });
+  </script>
+</body>
+</html>
