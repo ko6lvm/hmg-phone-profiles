@@ -22,9 +22,19 @@ chmod 777 "$DATA_DIR" 2>/dev/null || true
 chmod 755 "$PKG_DIR/svc/helper.sh" 2>/dev/null || true
 chmod 755 "$PKG_DIR/scripts/"*.sh 2>/dev/null || true
 
-# Initialize default configuration if not already present
+# Initialize or refresh configuration if missing or containing mock placeholders
+needs_init=false
 if [ ! -f "$CONFIG_FILE" ]; then
-    cat <<'EOF' > "$CONFIG_FILE"
+    needs_init=true
+elif grep -q "AA:BB:CC:11:22:33" "$CONFIG_FILE" 2>/dev/null; then
+    needs_init=true
+fi
+
+if [ "$needs_init" = "true" ]; then
+    bonded=$("$PKG_DIR/svc/helper.sh" bonded 2>/dev/null || true)
+    if [ -n "$bonded" ]; then
+        echo "[autoprofile.selector] Populating configuration with active vehicle Bluetooth devices..."
+        cat <<'EOF' > "$CONFIG_FILE"
 {
   "version": 1,
   "settings": {
@@ -35,33 +45,44 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "detection_window_sec": 10
   },
   "phones": [
-    {
-      "id": 1,
-      "name": "Pixel 11 Pro XL",
-      "bt_mac": "AA:BB:CC:11:22:33",
-      "wifi_mac": "02:00:00:11:22:33",
-      "assigned_driver": 1,
-      "priority": 1
-    },
-    {
-      "id": 2,
-      "name": "iPhone Duo",
-      "bt_mac": "DD:EE:FF:44:55:66",
-      "wifi_mac": "02:00:00:44:55:66",
-      "assigned_driver": 2,
-      "priority": 2
-    },
-    {
-      "id": 3,
-      "name": "Samsung S26 Ultra",
-      "bt_mac": "11:22:33:AA:BB:CC",
-      "wifi_mac": null,
-      "assigned_driver": 0,
-      "priority": 0
-    }
-  ]
+EOF
+        idx=1
+        first=true
+        while IFS='|' read -r bname bmac; do
+            [ -z "$bmac" ] && continue
+            if [ "$first" = "false" ]; then echo "    }," >> "$CONFIG_FILE"; fi
+            first=false
+            echo "    {" >> "$CONFIG_FILE"
+            echo "      \"id\": $idx," >> "$CONFIG_FILE"
+            echo "      \"name\": \"$bname\"," >> "$CONFIG_FILE"
+            echo "      \"bt_mac\": \"$bmac\"," >> "$CONFIG_FILE"
+            echo "      \"wifi_mac\": null," >> "$CONFIG_FILE"
+            drv=$idx
+            if [ "$idx" -gt 2 ]; then drv=0; fi
+            echo "      \"assigned_driver\": $drv," >> "$CONFIG_FILE"
+            echo "      \"priority\": $drv" >> "$CONFIG_FILE"
+            idx=$((idx + 1))
+        done <<EOF
+$bonded
+EOF
+        if [ "$first" = "false" ]; then echo "    }" >> "$CONFIG_FILE"; fi
+        echo '  ]' >> "$CONFIG_FILE"
+        echo '}' >> "$CONFIG_FILE"
+    else
+        cat <<'EOF' > "$CONFIG_FILE"
+{
+  "version": 1,
+  "settings": {
+    "auto_select": true,
+    "dismiss_notice": false,
+    "show_banner": true,
+    "conflict_policy": "p1",
+    "detection_window_sec": 10
+  },
+  "phones": []
 }
 EOF
+    fi
 fi
 
 chmod 666 "$CONFIG_FILE" 2>/dev/null || true

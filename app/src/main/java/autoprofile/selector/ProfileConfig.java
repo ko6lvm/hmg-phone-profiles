@@ -212,4 +212,14 @@ public class ProfileConfig {
         }
         return null;
     }
+
+    public PhoneItem findPhoneByBtMac(String mac) {
+        if (mac == null || mac.trim().isEmpty()) return null;
+        for (PhoneItem item : phones) {
+            if (item.btMac != null && item.btMac.equalsIgnoreCase(mac.trim())) {
+                return item;
+            }
+        }
+        return null;
+    }
 }

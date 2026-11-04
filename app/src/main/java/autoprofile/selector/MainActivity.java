@@ -46,6 +46,15 @@ public class MainActivity extends Activity {
     private View mRowPhone1;
     private View mRowPhone2;
     private View mRowPhone3;
+    private TextView mNamePhone1;
+    private TextView mNamePhone2;
+    private TextView mNamePhone3;
+    private TextView mBadgePhone1;
+    private TextView mBadgePhone2;
+    private TextView mBadgePhone3;
+    private TextView mMetaPhone1;
+    private TextView mMetaPhone2;
+    private TextView mMetaPhone3;
     private TextView mTagPhone1;
     private TextView mTagPhone2;
     private TextView mTagPhone3;
@@ -75,13 +84,13 @@ public class MainActivity extends Activity {
         initViews();
         setupListeners();
         applyConfigToUi();
-        refreshStatusAsync();
+        refreshAllAsync(false);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        refreshStatusAsync();
+        refreshAllAsync(false);
     }
 
     private void initFonts() {
@@ -114,6 +123,15 @@ public class MainActivity extends Activity {
         mRowPhone1 = findViewById(R.id.row_phone_1);
         mRowPhone2 = findViewById(R.id.row_phone_2);
         mRowPhone3 = findViewById(R.id.row_phone_3);
+        mNamePhone1 = (TextView) findViewById(R.id.name_phone_1);
+        mNamePhone2 = (TextView) findViewById(R.id.name_phone_2);
+        mNamePhone3 = (TextView) findViewById(R.id.name_phone_3);
+        mBadgePhone1 = (TextView) findViewById(R.id.badge_phone_1);
+        mBadgePhone2 = (TextView) findViewById(R.id.badge_phone_2);
+        mBadgePhone3 = (TextView) findViewById(R.id.badge_phone_3);
+        mMetaPhone1 = (TextView) findViewById(R.id.meta_phone_1);
+        mMetaPhone2 = (TextView) findViewById(R.id.meta_phone_2);
+        mMetaPhone3 = (TextView) findViewById(R.id.meta_phone_3);
         mTagPhone1 = (TextView) findViewById(R.id.tag_phone_1);
         mTagPhone2 = (TextView) findViewById(R.id.tag_phone_2);
         mTagPhone3 = (TextView) findViewById(R.id.tag_phone_3);
@@ -150,6 +168,9 @@ public class MainActivity extends Activity {
             applyTypeface(mPillDaemon, mHyundaiSans);
             applyTypeface(mPillGear, mHyundaiSans);
             applyTypeface(mPillProfile, mHyundaiSans);
+            if (mNamePhone1 != null) applyTypeface(mNamePhone1, mHyundaiSans);
+            if (mNamePhone2 != null) applyTypeface(mNamePhone2, mHyundaiSans);
+            if (mNamePhone3 != null) applyTypeface(mNamePhone3, mHyundaiSans);
         }
     }
 
@@ -312,8 +333,8 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_refresh_phones).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                refreshStatusAsync();
-                showToastBanner("Refreshed phone presence and vehicle telemetry.");
+                showToastBanner("Refreshing paired devices and vehicle telemetry...");
+                refreshAllAsync(true);
             }
         });
 
@@ -353,26 +374,78 @@ public class MainActivity extends Activity {
             mSpinnerWindow.setSelection(0);
         }
 
-        updatePhoneTags();
+        updatePhoneListUi(null);
     }
 
-    private void updatePhoneTags() {
-        for (ProfileConfig.PhoneItem item : mConfig.phones) {
-            TextView tagView = null;
-            if (item.id == 1) tagView = mTagPhone1;
-            else if (item.id == 2) tagView = mTagPhone2;
-            else if (item.id == 3) tagView = mTagPhone3;
+    private void updatePhoneListUi(PhoneFingerprintManager.PresenceResult presence) {
+        java.util.List<ProfileConfig.PhoneItem> phones = mConfig.phones;
 
-            if (tagView != null) {
-                if (item.assignedDriver == 1) {
-                    tagView.setText("Driver 1");
-                    tagView.setBackgroundResource(R.drawable.tag_driver1);
-                } else if (item.assignedDriver == 2) {
-                    tagView.setText("Driver 2");
-                    tagView.setBackgroundResource(R.drawable.tag_driver2);
-                } else {
-                    tagView.setText("Ignored");
-                    tagView.setBackgroundResource(R.drawable.tag_ignored);
+        View[] rows = new View[]{ mRowPhone1, mRowPhone2, mRowPhone3 };
+        TextView[] names = new TextView[]{ mNamePhone1, mNamePhone2, mNamePhone3 };
+        TextView[] metas = new TextView[]{ mMetaPhone1, mMetaPhone2, mMetaPhone3 };
+        TextView[] badges = new TextView[]{ mBadgePhone1, mBadgePhone2, mBadgePhone3 };
+        TextView[] tags = new TextView[]{ mTagPhone1, mTagPhone2, mTagPhone3 };
+
+        if (phones == null || phones.isEmpty()) {
+            if (rows[0] != null) rows[0].setVisibility(View.VISIBLE);
+            if (names[0] != null) names[0].setText("No Paired Phones Found");
+            if (metas[0] != null) metas[0].setText("Tap Refresh Phones or pair your phone in Settings");
+            if (badges[0] != null) {
+                badges[0].setText("None");
+                badges[0].setBackgroundResource(R.drawable.badge_paired);
+                badges[0].setTextColor(getResources().getColor(R.color.text_secondary));
+            }
+            if (tags[0] != null) {
+                tags[0].setText("Ignored");
+                tags[0].setBackgroundResource(R.drawable.tag_ignored);
+            }
+            if (rows[1] != null) rows[1].setVisibility(View.GONE);
+            if (rows[2] != null) rows[2].setVisibility(View.GONE);
+            return;
+        }
+
+        for (int i = 0; i < 3; i++) {
+            if (i < phones.size()) {
+                ProfileConfig.PhoneItem item = phones.get(i);
+                if (rows[i] != null) rows[i].setVisibility(View.VISIBLE);
+                if (names[i] != null) names[i].setText(item.name);
+                if (metas[i] != null) {
+                    String wifiStr = item.wifiMac != null ? item.wifiMac : "Unmapped";
+                    String driverStr = (item.assignedDriver > 0) ? ("Driver " + item.assignedDriver + " #" + item.priority) : "Ignored";
+                    metas[i].setText("BT: " + item.btMac + " · Wi-Fi: " + wifiStr + " · " + driverStr);
+                }
+                if (badges[i] != null) {
+                    boolean btConn = (presence != null && item.btMac != null && presence.connectedBtMacs.contains(item.btMac.toUpperCase()));
+                    boolean wifiConn = (presence != null && item.wifiMac != null && presence.connectedWifiMacs.contains(item.wifiMac.toUpperCase()));
+                    if (btConn && wifiConn) {
+                        badges[i].setText("● BT + Wi-Fi Active");
+                        badges[i].setBackgroundResource(R.drawable.badge_active);
+                        badges[i].setTextColor(getResources().getColor(R.color.accent_green));
+                    } else if (btConn) {
+                        badges[i].setText("● BT Active");
+                        badges[i].setBackgroundResource(R.drawable.badge_active);
+                        badges[i].setTextColor(getResources().getColor(R.color.accent_green));
+                    } else {
+                        badges[i].setText("Paired");
+                        badges[i].setBackgroundResource(R.drawable.badge_paired);
+                        badges[i].setTextColor(getResources().getColor(R.color.text_secondary));
+                    }
+                }
+                if (tags[i] != null) {
+                    if (item.assignedDriver == 1) {
+                        tags[i].setText("Driver 1");
+                        tags[i].setBackgroundResource(R.drawable.tag_driver1);
+                    } else if (item.assignedDriver == 2) {
+                        tags[i].setText("Driver 2");
+                        tags[i].setBackgroundResource(R.drawable.tag_driver2);
+                    } else {
+                        tags[i].setText("Ignored");
+                        tags[i].setBackgroundResource(R.drawable.tag_ignored);
+                    }
+                }
+            } else {
+                if (rows[i] != null) {
+                    rows[i].setVisibility(View.GONE);
                 }
             }
         }
@@ -395,7 +468,7 @@ public class MainActivity extends Activity {
             phone.assignedDriver = driverId;
             phone.priority = driverId;
             mConfig.save(this);
-            updatePhoneTags();
+            updatePhoneListUi(null);
             String name = (driverId == 1) ? "Driver 1" : (driverId == 2 ? "Driver 2" : "Ignored");
             showToastBanner(phone.name + " assigned to " + name);
         }
@@ -403,6 +476,7 @@ public class MainActivity extends Activity {
     }
 
     private void triggerTestSwitch(final int targetDriver) {
+        showToastBanner("Executing switch to Driver " + targetDriver + " in Park (P)...");
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -421,21 +495,39 @@ public class MainActivity extends Activity {
                         } else {
                             showToastBanner("Switch blocked: Vehicle is NOT in Park (P)!");
                         }
-                        refreshStatusAsync();
+                        refreshAllAsync(false);
                     }
                 });
             }
         }).start();
     }
 
-    private void refreshStatusAsync() {
+    private void refreshAllAsync(final boolean showToastOnComplete) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                final boolean inPark = VehicleActuator.isParkGear();
-                final int currentUid = VehicleActuator.getCurrentUserId();
+                // 1. Refresh paired phones if requested or if placeholders/empty
+                boolean hasPlaceholders = false;
+                for (ProfileConfig.PhoneItem p : mConfig.phones) {
+                    if (PhoneFingerprintManager.isPlaceholderPhone(p)) {
+                        hasPlaceholders = true;
+                        break;
+                    }
+                }
+                if (showToastOnComplete || mConfig.phones.isEmpty() || hasPlaceholders) {
+                    PhoneFingerprintManager.refreshPairedPhones(MainActivity.this, mConfig);
+                }
 
-                // Check daemon PID and heartbeat in state file
+                // 2. Query presence
+                final int currentUid = VehicleActuator.getCurrentUserId();
+                final PhoneFingerprintManager.PresenceResult presence =
+                        PhoneFingerprintManager.evaluatePresence(mConfig, currentUid);
+
+                // 3. Query gear state & profile name
+                final boolean inPark = VehicleActuator.isParkGear();
+                final String currentDriverName = VehicleActuator.getUserName(currentUid);
+
+                // 4. Check daemon status
                 File pidFile = new File("/data/nemesis/apps/autoprofile.selector/data/helper.pid");
                 if (!pidFile.exists()) {
                     pidFile = new File("/data/local/tmp/autoprofile_helper.pid");
@@ -446,7 +538,12 @@ public class MainActivity extends Activity {
                 }
                 long now = System.currentTimeMillis() / 1000;
                 long stateModified = stateFile.exists() ? (stateFile.lastModified() / 1000) : 0;
-                final boolean daemonRunning = pidFile.exists() || (stateFile.exists() && (now - stateModified < 15));
+                boolean daemonActive = pidFile.exists() || (stateFile.exists() && (now - stateModified < 15));
+                if (!daemonActive) {
+                    RootBridge.Result rPs = RootBridge.runCommand("ps | grep -i helper.sh");
+                    if (rPs.output != null && rPs.output.contains("helper.sh")) daemonActive = true;
+                }
+                final boolean daemonRunning = daemonActive;
 
                 mHandler.post(new Runnable() {
                     @Override
@@ -471,13 +568,20 @@ public class MainActivity extends Activity {
 
                         // Active profile pill
                         if (currentUid == 1) {
-                            mPillProfile.setText(R.string.active_driver_1);
+                            mPillProfile.setText("Active: " + (currentDriverName != null ? currentDriverName : "Driver 1"));
                         } else if (currentUid == 2) {
-                            mPillProfile.setText(R.string.active_driver_2);
+                            mPillProfile.setText("Active: " + (currentDriverName != null ? currentDriverName : "Driver 2"));
                         } else if (currentUid == 0) {
-                            mPillProfile.setText(R.string.active_guest);
+                            mPillProfile.setText("Active: Guest");
                         } else {
-                            mPillProfile.setText(R.string.active_driver_1); // Preview default
+                            mPillProfile.setText("Active: " + (currentDriverName != null ? currentDriverName : "Driver 1"));
+                        }
+
+                        // Update phone rows
+                        updatePhoneListUi(presence);
+
+                        if (showToastOnComplete) {
+                            showToastBanner("Found " + mConfig.phones.size() + " paired phone(s). Telemetry refreshed.");
                         }
                     }
                 });

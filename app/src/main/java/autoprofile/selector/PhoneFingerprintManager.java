@@ -1,5 +1,8 @@
 package autoprofile.selector;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.util.Log;
@@ -94,20 +97,49 @@ public class PhoneFingerprintManager {
     }
 
     /**
-     * Queries connected Bluetooth MACs from system Binder services.
+     * Checks if a configured phone entry is a dummy placeholder matching default mocks.
+     */
+    public static boolean isPlaceholderPhone(ProfileConfig.PhoneItem item) {
+        if (item == null) return false;
+        String mac = item.btMac != null ? item.btMac.toUpperCase() : "";
+        if ("AA:BB:CC:11:22:33".equals(mac) ||
+            "DD:EE:FF:44:55:66".equals(mac) ||
+            "11:22:33:AA:BB:CC".equals(mac)) {
+            return true;
+        }
+        String name = item.name != null ? item.name : "";
+        if ("Pixel 11 Pro XL".equalsIgnoreCase(name) ||
+            "iPhone Duo".equalsIgnoreCase(name) ||
+            "Samsung S26 Ultra".equalsIgnoreCase(name)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Queries connected Bluetooth MACs from RootBridge helper and system Binder services.
      */
     public static Set<String> queryConnectedBtMacs() {
         Set<String> btMacs = new HashSet<String>();
 
-        // Query bluetooth_manager Tx 17
-        queryBinderMac("bluetooth_manager", 17, btMacs);
+        // 1. Query via RootBridge helper (svc/helper.sh detect)
+        try {
+            RootBridge.Result res = RootBridge.runHelper("detect");
+            if (res.output != null && !res.output.isEmpty()) {
+                Matcher m = MAC_PATTERN.matcher(res.output);
+                while (m.find()) {
+                    btMacs.add(m.group().toUpperCase());
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "RootBridge detect threw: " + t.getMessage());
+        }
 
-        // Query phoneprojection Tx 5 (Device BT MAC), Tx 8 (CarPlay), Tx 9 (Android Auto)
+        // 2. Query direct Binder services
+        queryBinderMac("bluetooth_manager", 17, btMacs);
         queryBinderMac("phoneprojection", 5, btMacs);
         queryBinderMac("phoneprojection", 8, btMacs);
         queryBinderMac("phoneprojection", 9, btMacs);
-
-        // Query dipo Tx 14 (CarPlay address)
         queryBinderMac("dipo", 14, btMacs);
 
         return btMacs;
@@ -272,5 +304,148 @@ public class PhoneFingerprintManager {
         }
 
         return result;
+    }
+
+    /**
+     * Refreshes the paired phones list from BluetoothAdapter and system IPC.
+     * Replaces placeholder mock devices with actual vehicle-bonded devices.
+     */
+    public static List<ProfileConfig.PhoneItem> refreshPairedPhones(Context context, ProfileConfig config) {
+        if (config == null) return new ArrayList<ProfileConfig.PhoneItem>();
+
+        List<ProfileConfig.PhoneItem> discovered = new ArrayList<ProfileConfig.PhoneItem>();
+        Set<String> seenMacs = new HashSet<String>();
+
+        // 1. Query Android standard BluetoothAdapter
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter != null) {
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                if (bonded != null) {
+                    for (BluetoothDevice dev : bonded) {
+                        String mac = dev.getAddress();
+                        if (mac != null && MAC_PATTERN.matcher(mac).matches()) {
+                            String macUpper = mac.toUpperCase();
+                            if (!seenMacs.contains(macUpper)) {
+                                seenMacs.add(macUpper);
+                                String name = dev.getName();
+                                if (name == null || name.trim().isEmpty()) {
+                                    name = "Paired Phone (" + macUpper.substring(Math.max(0, macUpper.length() - 5)) + ")";
+                                }
+                                discovered.add(new ProfileConfig.PhoneItem(0, name.trim(), macUpper, null, 0, 0));
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "BluetoothAdapter query failed: " + t.getMessage());
+        }
+
+        // 2. Query RootBridge helper bonded subcommand
+        try {
+            RootBridge.Result res = RootBridge.runHelper("bonded");
+            if (res.output != null && !res.output.isEmpty()) {
+                String[] lines = res.output.split("\\r?\\n");
+                for (String line : lines) {
+                    String trimmed = line.trim();
+                    if (trimmed.contains("|")) {
+                        String[] parts = trimmed.split("\\|", 2);
+                        String name = parts[0].trim();
+                        String mac = parts[1].trim().toUpperCase();
+                        if (MAC_PATTERN.matcher(mac).matches() && !seenMacs.contains(mac)) {
+                            seenMacs.add(mac);
+                            if (name.isEmpty()) name = "Paired Device";
+                            discovered.add(new ProfileConfig.PhoneItem(0, name, mac, null, 0, 0));
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "RootBridge bonded query failed: " + t.getMessage());
+        }
+
+        // 3. Query actively connected device via phoneprojection Tx 4 & 5
+        try {
+            RootBridge.Result rName = RootBridge.runCommand("/system/bin/service call phoneprojection 4");
+            String connName = decodeParcelString(rName.output);
+            RootBridge.Result rMac = RootBridge.runCommand("/system/bin/service call phoneprojection 5");
+            String connMacRaw = decodeParcelString(rMac.output);
+            Matcher m = MAC_PATTERN.matcher(connMacRaw);
+            if (m.find()) {
+                String connMac = m.group().toUpperCase();
+                if (!seenMacs.contains(connMac)) {
+                    seenMacs.add(connMac);
+                    String name = (!connName.isEmpty() && !connName.contains("<null>")) ? connName.trim() : "Connected Phone";
+                    discovered.add(new ProfileConfig.PhoneItem(0, name, connMac, null, 0, 0));
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 4. Merge discovered devices into config.phones
+        if (!discovered.isEmpty()) {
+            // Check if existing config contains only placeholders
+            boolean onlyPlaceholders = true;
+            for (ProfileConfig.PhoneItem existing : config.phones) {
+                if (!isPlaceholderPhone(existing)) {
+                    onlyPlaceholders = false;
+                    break;
+                }
+            }
+
+            if (onlyPlaceholders) {
+                config.phones.clear();
+            }
+
+            // Merge each discovered phone
+            int nextId = config.phones.size() + 1;
+            for (ProfileConfig.PhoneItem disc : discovered) {
+                ProfileConfig.PhoneItem existing = config.findPhoneByBtMac(disc.btMac);
+                if (existing != null) {
+                    // Update name if it changed
+                    if (disc.name != null && !disc.name.isEmpty()) {
+                        existing.name = disc.name;
+                    }
+                } else {
+                    // Determine initial driver assignment if free
+                    boolean hasDriver1 = false;
+                    boolean hasDriver2 = false;
+                    for (ProfileConfig.PhoneItem p : config.phones) {
+                        if (p.assignedDriver == 1) hasDriver1 = true;
+                        if (p.assignedDriver == 2) hasDriver2 = true;
+                    }
+
+                    int assign = 0;
+                    int prio = 0;
+                    if (!hasDriver1) {
+                        assign = 1;
+                        prio = 1;
+                    } else if (!hasDriver2) {
+                        assign = 2;
+                        prio = 2;
+                    }
+
+                    disc.id = nextId++;
+                    disc.assignedDriver = assign;
+                    disc.priority = prio;
+                    config.phones.add(disc);
+                }
+            }
+
+            // Auto-map Wi-Fi stations if present in ARP
+            Set<String> arpStations = readArpStations();
+            if (!arpStations.isEmpty()) {
+                for (ProfileConfig.PhoneItem p : config.phones) {
+                    if (p.wifiMac == null && p.assignedDriver == 1) {
+                        p.wifiMac = arpStations.iterator().next();
+                        break;
+                    }
+                }
+            }
+
+            config.save(context);
+        }
+
+        return config.phones;
     }
 }

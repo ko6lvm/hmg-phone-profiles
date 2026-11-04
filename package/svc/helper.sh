@@ -229,6 +229,46 @@ has_active_projection_tcp() {
     return 1
 }
 
+get_bonded_devices() {
+    # 1. Connected Device Name & BT MAC from phoneprojection
+    raw_p4=$(service call phoneprojection 4 2>/dev/null || true)
+    name_p4=$(decode_parcel_str "$raw_p4")
+    raw_p5=$(service call phoneprojection 5 2>/dev/null || true)
+    mac_p5=$(decode_parcel_str "$raw_p5" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_p5" ] && [ -n "$name_p4" ] && [ "$name_p4" != "<null>" ] && [ "$name_p4" != "<empty>" ]; then
+        echo "$name_p4|$mac_p5"
+    fi
+
+    # 2. Connected HFP Phone from bluetooth_manager
+    raw_b17=$(service call bluetooth_manager 17 2>/dev/null || true)
+    mac_b17=$(decode_parcel_str "$raw_b17" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_b17" ] && [ "$mac_b17" != "$mac_p5" ]; then
+        echo "Connected Phone|$mac_b17"
+    fi
+
+    # 3. Dumpsys bluetooth / bluetooth_manager for bonded devices
+    dump=$(dumpsys bluetooth 2>/dev/null || dumpsys bluetooth_manager 2>/dev/null || true)
+    if [ -n "$dump" ]; then
+        echo "$dump" | awk '
+        /Bonded devices:/ { in_b = 1; next }
+        /mBondedDevices:/ { in_b = 1; next }
+        /^[A-Z]/ && in_b { in_b = 0 }
+        in_b {
+            line = $0
+            if (match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)) {
+                mac = toupper(substr(line, RSTART, RLENGTH))
+                sub(/^[ \t]*/, "", line)
+                sub(mac, "", line)
+                gsub(/[\(\)\[\]]/, "", line)
+                sub(/^[ \t]*/, "", line); sub(/[ \t]*$/, "", line)
+                name = line
+                if (name == "") name = "Paired Phone"
+                print name "|" mac
+            }
+        }'
+    fi
+}
+
 # ------------------------------------------------------------------------------
 # Configuration Synchronization & Parsing
 # ------------------------------------------------------------------------------
@@ -545,6 +585,25 @@ case "$cmd" in
             echo "NOT_PARK (0)"
             exit 1
         fi
+        ;;
+    is-park)
+        if is_in_park; then
+            echo "true"
+            exit 0
+        else
+            echo "false"
+            exit 1
+        fi
+        ;;
+    get-profile)
+        get_active_profile
+        ;;
+    get-profile-name)
+        uid="${2:-$(get_active_profile)}"
+        get_profile_name "$uid"
+        ;;
+    bonded)
+        get_bonded_devices
         ;;
     switch)
         target="${2:-1}"

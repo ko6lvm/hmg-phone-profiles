@@ -213,6 +213,7 @@
                                     android:orientation="horizontal">
 
                                     <TextView
+                                        android:id="@+id/name_phone_1"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="Pixel 11 Pro XL"
@@ -287,6 +288,7 @@
                                     android:orientation="horizontal">
 
                                     <TextView
+                                        android:id="@+id/name_phone_2"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="iPhone Duo"
@@ -361,6 +363,7 @@
                                     android:orientation="horizontal">
 
                                     <TextView
+                                        android:id="@+id/name_phone_3"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="Samsung S26 Ultra"

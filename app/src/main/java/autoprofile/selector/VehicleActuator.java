@@ -116,7 +116,31 @@ public class VehicleActuator {
      * com.hkmc.micom.system Tx 36 returns 1 when in Park, 0 otherwise.
      */
     public static boolean isParkGear() {
-        // Try direct Binder transact first
+        // 1. Try RootBridge helper first (privilege-escalated execution via NEMESIS / su)
+        try {
+            RootBridge.Result rHelper = RootBridge.runHelper("gear");
+            if (rHelper.output != null && !rHelper.output.isEmpty()) {
+                if (rHelper.output.contains("PARK") || rHelper.exitCode == 0) {
+                    return true;
+                } else if (rHelper.output.contains("NOT_PARK")) {
+                    return false;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "RootBridge gear check threw: " + t.getMessage());
+        }
+
+        // 2. Try direct root service call
+        try {
+            RootBridge.Result rCmd = RootBridge.runCommand("/system/bin/service call " + SVC_SYSTEM + " " + TX_GEAR_P_STATUS);
+            if (rCmd.output != null && rCmd.output.contains("00000000 00000001")) {
+                return true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "RootBridge service call threw: " + t.getMessage());
+        }
+
+        // 3. Try direct Binder transact
         IBinder binder = getService(SVC_SYSTEM);
         if (binder != null) {
             Parcel data = Parcel.obtain();
@@ -134,7 +158,7 @@ public class VehicleActuator {
             }
         }
 
-        // Fallback to service call CLI
+        // 4. Fallback to unprivileged toolbox service call CLI
         String output = execServiceCall(SVC_SYSTEM, TX_GEAR_P_STATUS);
         return output.contains("00000000 00000001");
     }
@@ -144,6 +168,26 @@ public class VehicleActuator {
      * 1 = Driver 1, 2 = Driver 2, 0 = Guest, -1 = Error.
      */
     public static int getCurrentUserId() {
+        // 1. Try RootBridge helper
+        try {
+            RootBridge.Result r = RootBridge.runHelper("get-profile");
+            String out = r.output != null ? r.output.trim() : "";
+            if ("1".equals(out)) return 1;
+            if ("2".equals(out)) return 2;
+            if ("0".equals(out)) return 0;
+        } catch (Throwable t) {
+            Log.w(TAG, "RootBridge get-profile threw: " + t.getMessage());
+        }
+
+        // 2. Try RootBridge service call
+        try {
+            RootBridge.Result rCmd = RootBridge.runCommand("/system/bin/service call " + SVC_USERPROFILE + " " + TX_GET_USER_ID);
+            if (rCmd.output.contains("00000000 00000001")) return 1;
+            if (rCmd.output.contains("00000000 00000002")) return 2;
+            if (rCmd.output.contains("00000000 00000000")) return 0;
+        } catch (Throwable ignored) {}
+
+        // 3. Try direct Binder transact
         IBinder binder = getService(SVC_USERPROFILE);
         if (binder != null) {
             Parcel data = Parcel.obtain();
@@ -171,6 +215,16 @@ public class VehicleActuator {
      * Gets the driver display name for a given userType.
      */
     public static String getUserName(int userType) {
+        // 1. Try RootBridge helper
+        try {
+            RootBridge.Result r = RootBridge.runHelper("get-profile-name", String.valueOf(userType));
+            String name = r.output != null ? r.output.trim() : "";
+            if (!name.isEmpty() && !name.contains("<null>") && !name.contains("<empty>") && !"Unknown".equalsIgnoreCase(name)) {
+                return name;
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Try direct Binder transact
         IBinder binder = getService(SVC_USERPROFILE);
         if (binder != null) {
             Parcel data = Parcel.obtain();
@@ -201,6 +255,10 @@ public class VehicleActuator {
      * Switches the active user profile (Tx 5) and updates pre-boot profile (Tx 44).
      */
     public static void switchUser(int userType) {
+        // Execute via RootBridge with full root privileges
+        RootBridge.runCommand("/system/bin/service call " + SVC_USERPROFILE + " " + TX_SWITCH_USER + " i32 " + userType + " i32 0 i32 0");
+        RootBridge.runCommand("/system/bin/service call " + SVC_USERPROFILE + " " + TX_SET_PREBOOT_USER + " i32 " + userType);
+
         IBinder binder = getService(SVC_USERPROFILE);
         if (binder != null) {
             Parcel data = Parcel.obtain();
@@ -229,9 +287,6 @@ public class VehicleActuator {
                 data44.recycle();
                 reply44.recycle();
             }
-        } else {
-            execServiceCall(SVC_USERPROFILE, TX_SWITCH_USER, "i32", String.valueOf(userType), "i32", "0", "i32", "0");
-            execServiceCall(SVC_USERPROFILE, TX_SET_PREBOOT_USER, "i32", String.valueOf(userType));
         }
     }
 
@@ -243,6 +298,8 @@ public class VehicleActuator {
     public static void recallSeatMemory(int driverId) {
         if (driverId != 1 && driverId != 2) return;
         int cmd = (driverId == 1) ? CMD_PBACK_P1 : CMD_PBACK_P2;
+
+        RootBridge.runCommand("/system/bin/service call " + SVC_VR + " " + TX_VR_AVN_IMS_CMD + " i32 " + cmd);
 
         IBinder binder = getService(SVC_VR);
         if (binder != null) {
@@ -257,8 +314,6 @@ public class VehicleActuator {
                 data.recycle();
                 reply.recycle();
             }
-        } else {
-            execServiceCall(SVC_VR, TX_VR_AVN_IMS_CMD, "i32", String.valueOf(cmd));
         }
     }
 
@@ -266,6 +321,9 @@ public class VehicleActuator {
      * Dismisses the startup ConsentScreen overlay via factory Tx 82 & notification Tx 24.
      */
     public static void dismissConsentScreen(int userType) {
+        RootBridge.runCommand("/system/bin/service call " + SVC_FACTORY + " " + TX_HIDE_CONSENT_SCREEN);
+        RootBridge.runCommand("/system/bin/service call " + SVC_NOTIFICATION + " " + TX_NOTIFY_CONSENT_CHANGED + " i32 1 i32 " + userType);
+
         IBinder factoryBinder = getService(SVC_FACTORY);
         if (factoryBinder != null) {
             Parcel data = Parcel.obtain();
@@ -278,8 +336,6 @@ public class VehicleActuator {
                 data.recycle();
                 reply.recycle();
             }
-        } else {
-            execServiceCall(SVC_FACTORY, TX_HIDE_CONSENT_SCREEN);
         }
 
         IBinder notifBinder = getService(SVC_NOTIFICATION);
@@ -296,8 +352,6 @@ public class VehicleActuator {
                 data.recycle();
                 reply.recycle();
             }
-        } else {
-            execServiceCall(SVC_NOTIFICATION, TX_NOTIFY_CONSENT_CHANGED, "i32", "1", "i32", String.valueOf(userType));
         }
     }
 
@@ -305,14 +359,22 @@ public class VehicleActuator {
      * Broadcasts native OEM toast notification (~5s global display across all apps).
      */
     public static void showOemToast(Context context, String message) {
-        if (context == null) return;
-        try {
-            Intent intent = new Intent(ACTION_OEM_TOAST);
-            intent.putExtra(EXTRA_TOAST_MESSAGE, message);
-            intent.putExtra(EXTRA_TOAST_POPUPSHOWING, true);
-            context.sendBroadcast(intent);
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to broadcast OEM Toast: " + t.getMessage());
+        if (message == null) message = "";
+        // 1. RootBridge broadcast
+        RootBridge.runCommand("/system/bin/am broadcast -a " + ACTION_OEM_TOAST +
+                " -e " + EXTRA_TOAST_MESSAGE + " \"" + message.replace("\"", "\\\"") + "\"" +
+                " --ez " + EXTRA_TOAST_POPUPSHOWING + " true");
+
+        // 2. Standard context broadcast fallback
+        if (context != null) {
+            try {
+                Intent intent = new Intent(ACTION_OEM_TOAST);
+                intent.putExtra(EXTRA_TOAST_MESSAGE, message);
+                intent.putExtra(EXTRA_TOAST_POPUPSHOWING, true);
+                context.sendBroadcast(intent);
+            } catch (Throwable t) {
+                Log.e(TAG, "Failed to broadcast OEM Toast: " + t.getMessage());
+            }
         }
     }
 
@@ -326,31 +388,33 @@ public class VehicleActuator {
         // 1. SAFETY GATE: Verify Park (P)
         if (!isParkGear()) {
             Log.w(TAG, "SAFETY GATE ABORT: Vehicle is NOT in Park (P)! Action blocked.");
-            if (showToast && context != null) {
+            if (showToast) {
                 showOemToast(context, "Action blocked: Vehicle is not in Park (P)");
             }
             return false;
         }
 
-        // 2. In-session Profile Switch + Pre-boot
-        switchUser(targetUid);
+        // 2. Try executing unified root switch flow via helper.sh
+        String subcmd = dismissNotice ? "full-flow" : "switch";
+        RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid));
+        if (r.exitCode == 0) {
+            Log.i(TAG, "Unified switch via RootBridge succeeded: " + r.output);
+            return true;
+        }
 
-        // 3. Dismiss Startup Notice if enabled
+        // 3. Fallback to granular steps if helper script was not available
+        switchUser(targetUid);
         if (dismissNotice) {
             dismissConsentScreen(targetUid);
         }
-
-        // 4. Recall Door Memory Button after 1.0s delay (allows stock USM settling)
         if (recallSeat && (targetUid == 1 || targetUid == 2)) {
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException ignored) {}
             recallSeatMemory(targetUid);
         }
-
-        // 5. Broadcast Native OEM Toast
-        String name = getUserName(targetUid);
-        if (showToast && context != null) {
+        if (showToast) {
+            String name = getUserName(targetUid);
             showOemToast(context, "Switched to " + name);
         }
 
