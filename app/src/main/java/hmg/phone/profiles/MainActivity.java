@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
         mHandler = new Handler();
         mConfig = ProfileConfig.getInstance(this);
 
-        AppLogger.i(TAG, "MainActivity initialized on Gen5W KitKat (API 19)");
+        AppLogger.i(TAG, "MainActivity initialized");
 
         initFonts();
         initViews();
@@ -199,7 +199,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_close).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showToastBanner("Package closed. Background daemon stays active.");
+                showToastBanner("Settings saved. Background service active.");
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -492,11 +492,11 @@ public class MainActivity extends Activity {
                     boolean btConn = (presence != null && item.btMac != null && presence.connectedBtMacs.contains(item.btMac.toUpperCase()));
                     boolean wifiConn = (presence != null && item.wifiMac != null && presence.connectedWifiMacs.contains(item.wifiMac.toUpperCase()));
                     if (btConn && wifiConn) {
-                        badges[i].setText("● BT + Wi-Fi Active");
+                        badges[i].setText("Active (BT + Wi-Fi)");
                         badges[i].setBackgroundResource(R.drawable.badge_active);
                         badges[i].setTextColor(getResources().getColor(R.color.accent_green));
                     } else if (btConn) {
-                        badges[i].setText("● BT Active");
+                        badges[i].setText("Active (BT)");
                         badges[i].setBackgroundResource(R.drawable.badge_active);
                         badges[i].setTextColor(getResources().getColor(R.color.accent_green));
                     } else {
@@ -714,7 +714,7 @@ public class MainActivity extends Activity {
         if (tab == 0) {
             mTxtLogSource.setText(R.string.tab_daemon_logs);
             mTxtLogSource.setTextColor(getResources().getColor(R.color.accent_blue));
-            mTxtLogContent.setText("Querying daemon logs via RootBridge...");
+            mTxtLogContent.setText("Querying service logs via RootBridge...");
             new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -726,7 +726,7 @@ public class MainActivity extends Activity {
                         RootBridge.Result rStat = RootBridge.runHelper("status");
                         content = (rStat.output != null && !rStat.output.trim().isEmpty())
                                 ? ("=== Helper Status ===\n" + rStat.output.trim())
-                                : "No daemon logs or status output returned.\nVerify helper.sh daemon status in Park (P).";
+                                : "No service logs or status output returned.\nVerify helper.sh status in Park (P).";
                     }
                     mHandler.post(new Runnable() {
                         @Override
@@ -771,7 +771,7 @@ public class MainActivity extends Activity {
 
     private void clearCurrentLogs() {
         if (mCurrentLogTab == 0) {
-            mTxtLogContent.setText("Clearing daemon logs...");
+            mTxtLogContent.setText("Clearing service logs...");
             new Thread(new Runnable() {
                 @Override
                 public void run() {

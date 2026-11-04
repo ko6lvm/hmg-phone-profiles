@@ -82,6 +82,24 @@ def main():
     print("    - No real vehicle headunit or phone hardware MACs")
     print("    - No private vehicle IPs or local home directory paths")
     print("    - Only RFC documentation MACs (02:00:00:.., AA:BB:CC..) and generic labels (Driver 1, Driver 2)")
+
+    # Verify UI cleanliness: No emojis, homebrew badges, or developer jargon in UI
+    print("Testing user-facing UI cleanliness (no homebrew text, emojis, or jargon)...")
+    ui_files = [
+        os.path.join(repo_root, "app", "src", "main", "res", "values", "strings.xml"),
+        os.path.join(repo_root, "app", "src", "main", "res", "layout", "activity_main.xml"),
+    ]
+    ui_forbidden = ["NEMESIS", "KitKat Gated Policy", "●", "💡", "⚠", "⟳", "📋", "🚗"]
+    for uif in ui_files:
+        if os.path.exists(uif):
+            with open(uif, "r", encoding="utf-8") as f:
+                content = f.read()
+                for term in ui_forbidden:
+                    if term in content:
+                        print(f"[ERROR] User-facing UI file {os.path.relpath(uif, repo_root)} contains forbidden term/emoji: '{term}'")
+                        sys.exit(1)
+
+    print("  ✓ User-facing UI cleanliness verified (zero emojis, badges, or developer jargon)")
     print("ALL SANITIZATION CHECKS PASSED!\n")
 
 if __name__ == "__main__":

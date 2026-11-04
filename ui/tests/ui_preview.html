@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto Profile Selector — Gen5W (260507) UI Preview</title>
+  <title>Auto Profile Selector — Gen5W UI Preview</title>
   <style>
     @font-face {
       font-family: 'Hyundai Sans';
@@ -824,9 +824,9 @@
   <div class="mac-control-bar">
     <div class="mac-control-group">
       <div class="mac-title">
-        🚗 Gen5W Display Mockup
+        Gen5W Display Mockup
         <span class="mac-badge">Stage 0 Preview</span>
-        <span class="mac-badge firmware">Firmware 260507</span>
+        <span class="mac-badge firmware">Gen5W Widescreen</span>
       </div>
     </div>
 
@@ -881,22 +881,21 @@
       <header class="title-bar">
         <div class="title-left">
           <div class="title-app-name">Auto Profile Selector</div>
-          <div class="title-credit">NEMESIS • 260507</div>
         </div>
         <div class="title-right">
           <div class="status-pills">
             <div class="status-pill online" id="daemon-pill">
               <span class="status-dot"></span>
-              <span>Daemon: RUNNING</span>
+              <span>Service: Running</span>
             </div>
             <div class="status-pill gear-p" id="gear-pill">
-              <span>Gear: PARK (P)</span>
+              <span>Gear: Park (P)</span>
             </div>
             <div class="status-pill active-profile" id="profile-pill">
               <span>Active: Driver 1</span>
             </div>
           </div>
-          <button class="btn-close" title="Close" onclick="showToast('Package closed. Background daemon stays active.')"></button>
+          <button class="btn-close" title="Close" onclick="showToast('Settings saved. Background service active.')"></button>
         </div>
         <div class="title-bar-shadow"></div>
       </header>
@@ -908,7 +907,7 @@
         <section class="column-panel" style="flex: 1.15;">
           <div class="panel-header">
             <h2>PAIRED PHONES (Tap row to assign)</h2>
-            <span>Dual BT + Auto-Learned Wi-Fi</span>
+            <span>Bluetooth &amp; Wi-Fi Devices</span>
           </div>
 
           <div class="panel-scroll-content">
@@ -918,7 +917,7 @@
               <div class="phone-info-left">
                 <div class="phone-title-line">
                   <span class="phone-name">Pixel 11 Pro XL</span>
-                  <span class="badge-pill active" id="badge-phone-1">● BT + Wi-Fi Active</span>
+                  <span class="badge-pill active" id="badge-phone-1">Active (BT + Wi-Fi)</span>
                 </div>
                 <div class="phone-meta-line">
                   <span>BT: AA:BB:CC:11:22:33</span>
@@ -969,7 +968,7 @@
 
             <!-- Info card explaining auto-learning -->
             <div style="margin-top:auto; padding:10px 14px; background:#181c1e; border:1px dashed #343d42; border-radius:6px; font-size:13px; color:#8c9ba0; line-height:1.4;">
-              💡 <strong>Auto-Learning:</strong> When only one paired phone is connected on Bluetooth and joins the car's 5 GHz hotspot, its Wi-Fi MAC is learned automatically from <code>/proc/net/arp</code>.
+              <strong>Automatic Association:</strong> When a single paired phone connects to Bluetooth and the vehicle hotspot, its Wi-Fi address is linked automatically.
             </div>
 
           </div>
@@ -979,7 +978,7 @@
         <section class="column-panel" style="flex: 0.85;">
           <div class="panel-header">
             <h2>SETTINGS</h2>
-            <span>KitKat Gated Policy</span>
+            <span>Vehicle &amp; Profile Options</span>
           </div>
 
           <div class="panel-scroll-content">
@@ -1002,11 +1001,11 @@
               <div class="setting-row" onclick="toggleSetting('dismissNotice')">
                 <div class="setting-label-group">
                   <div class="hkmc-checkbox" id="chk-dismiss"></div>
-                  <span class="setting-title">Dismiss startup notice (opt-in) <span class="warn-icon">⚠</span></span>
+                  <span class="setting-title">Dismiss startup notice (opt-in)</span>
                 </div>
               </div>
               <div class="setting-desc">
-                Calls <code>hideConsentScreen()</code> in Park only. Tap to configure warning opt-in.
+                Automatically dismisses navigation warning in Park only. Tap to configure.
               </div>
             </div>
 
@@ -1051,7 +1050,7 @@
       <!-- Bottom Bar -->
       <footer class="bottom-bar">
         <button class="hkmc-bottom-btn" onclick="refreshPhones()">
-          <span>⟳ Refresh Phones</span>
+          <span>Refresh Phones</span>
         </button>
         <button class="hkmc-bottom-btn" onclick="testSwitch(1)">
           <span>Test: Driver 1</span>
@@ -1060,7 +1059,7 @@
           <span>Test: Driver 2</span>
         </button>
         <button class="hkmc-bottom-btn" style="color: var(--accent-blue);" onclick="toggleLogsDialog(true)">
-          <span>📋 View Logs</span>
+          <span>View Logs</span>
         </button>
       </footer>
 
@@ -1073,10 +1072,10 @@
           </div>
           <div class="dialog-body">
             <div>
-              Enabling this option calls <code>IMicomFactoryService.hideConsentScreen()</code> upon vehicle wake.
+              Enabling this option dismisses the navigation safety screen upon vehicle start.
             </div>
             <div class="warning-box">
-              ⚠ <strong>Safety Agreement:</strong> This bypasses the stock startup "Confirm" safety prompt automatically while parked. Ensure all drivers understand vehicle safety guidelines before enabling.
+              <strong>Safety Notice:</strong> This bypasses the startup confirmation screen automatically while parked. Ensure all drivers understand vehicle safety guidelines before enabling.
             </div>
           </div>
           <div class="dialog-btn-bar">
@@ -1122,17 +1121,17 @@
           <div class="dialog-title-bar">
             <div style="display:flex; align-items:center; gap:10px;">
               <span class="dialog-title">System &amp; Diagnostic Logs</span>
-              <span id="log-tab-badge" style="background:#202528; color:var(--accent-blue); padding:3px 8px; border-radius:4px; font-size:12px; font-weight:bold;">Daemon Log</span>
+              <span id="log-tab-badge" style="background:#202528; color:var(--accent-blue); padding:3px 8px; border-radius:4px; font-size:12px; font-weight:bold;">Service Log</span>
             </div>
             <button class="btn-close" style="width:50px; height:50px; background-size:36px;" onclick="toggleLogsDialog(false)"></button>
           </div>
           <div class="dialog-body">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-              <button class="dialog-btn" id="btn-tab-daemon" style="padding:6px 14px; font-size:13px; color:var(--accent-blue);" onclick="switchLogTab('daemon')">Daemon Log</button>
+              <button class="dialog-btn" id="btn-tab-daemon" style="padding:6px 14px; font-size:13px; color:var(--accent-blue);" onclick="switchLogTab('daemon')">Service Log</button>
               <button class="dialog-btn" id="btn-tab-app" style="padding:6px 14px; font-size:13px;" onclick="switchLogTab('app')">App Events</button>
               <button class="dialog-btn" id="btn-tab-logcat" style="padding:6px 14px; font-size:13px;" onclick="switchLogTab('logcat')">Logcat</button>
               <div style="flex:1;"></div>
-              <button class="dialog-btn" style="padding:6px 14px; font-size:13px; color:var(--accent-green);" onclick="refreshLogs()">⟳ Refresh</button>
+              <button class="dialog-btn" style="padding:6px 14px; font-size:13px; color:var(--accent-green);" onclick="refreshLogs()">Refresh</button>
               <button class="dialog-btn" style="padding:6px 14px; font-size:13px; color:var(--text-secondary);" onclick="clearLogs()">Clear</button>
             </div>
             <div id="log-terminal" style="background:#0d1012; border:1px solid #202528; border-radius:6px; padding:12px; height:320px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.4; color:#b0bec5; white-space:pre-wrap;">=== Daemon Log (/data/nemesis/apps/hmg-phone-profiles/data/daemon.log) ===
@@ -1241,7 +1240,7 @@
 
       if (preset === 'pixel') {
         b1.className = 'badge-pill active';
-        b1.textContent = '● BT + Wi-Fi Active';
+        b1.textContent = 'Active (BT + Wi-Fi)';
         b2.className = 'badge-pill paired';
         b2.textContent = 'Paired';
         r1.classList.add('selected');
@@ -1250,14 +1249,14 @@
         b1.className = 'badge-pill paired';
         b1.textContent = 'Paired';
         b2.className = 'badge-pill carplay';
-        b2.textContent = '● CarPlay Wi-Fi Active';
+        b2.textContent = 'Active (CarPlay Wi-Fi)';
         r2.classList.add('selected');
         setProfile(2, "iPhone Duo (Wireless CarPlay)");
       } else if (preset === 'conflict') {
         b1.className = 'badge-pill active';
-        b1.textContent = '● BT Connected';
+        b1.textContent = 'Active (BT)';
         b2.className = 'badge-pill carplay';
-        b2.textContent = '● CarPlay Wi-Fi Active';
+        b2.textContent = 'Active (CarPlay Wi-Fi)';
         r1.classList.add('selected');
         setProfile(1, "Conflict: Resolved to Priority #1 (Driver 1)");
       } else if (preset === 'none') {
@@ -1434,7 +1433,7 @@ BT Connected: AA:BB:CC:11:22:33
 Wi-Fi Stations: 02:00:00:11:22:33
 Active Projection: NO`;
       } else if (activeLogTab === 'app') {
-        term.textContent = `[11-04 08:35:00] [INFO] [MainActivity] MainActivity started on Gen5W head unit (KitKat API 19)
+        term.textContent = `[11-04 08:35:00] [INFO] [MainActivity] MainActivity started on Gen5W head unit
 [11-04 08:35:01] [INFO] [PhoneFingerprintManager] refreshPairedPhones: found 2 devices
 [11-04 08:35:02] [INFO] [PhoneFingerprintManager] evaluatePresence: BT=[AA:BB:CC:11:22:33], WiFi=[02:00:00:11:22:33], matched=1
 [11-04 08:35:03] [INFO] [VehicleActuator] executeSafeSwitch Driver 1 (Manual)
