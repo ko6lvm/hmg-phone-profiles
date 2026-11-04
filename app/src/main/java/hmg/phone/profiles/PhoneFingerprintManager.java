@@ -246,6 +246,7 @@ public class PhoneFingerprintManager {
                 matchedPhones.add(phone);
             }
         }
+        AppLogger.i(TAG, "evaluatePresence: BT=" + result.connectedBtMacs + ", WiFi=" + result.connectedWifiMacs + ", matched=" + matchedPhones.size());
 
         // Auto-learning: If only one BT phone connected and an unmapped Wi-Fi MAC is active
         if (matchedPhones.size() == 1) {
@@ -254,6 +255,7 @@ public class PhoneFingerprintManager {
                 String learned = result.connectedWifiMacs.iterator().next();
                 single.wifiMac = learned;
                 Log.i(TAG, "Auto-learned Wi-Fi MAC " + learned + " for " + single.name);
+                AppLogger.i(TAG, "Auto-learned Wi-Fi MAC " + learned + " for " + single.name);
                 config.save(null);
             }
         }

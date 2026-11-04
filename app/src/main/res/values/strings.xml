@@ -33,6 +33,14 @@
     <string name="btn_refresh">⟳ Refresh Phones</string>
     <string name="btn_test_d1">Test: Driver 1</string>
     <string name="btn_test_d2">Test: Driver 2</string>
+    <string name="btn_logs">📋 View Logs</string>
+
+    <!-- Logs Dialog -->
+    <string name="dialog_logs_title">System &amp; Diagnostic Logs</string>
+    <string name="tab_daemon_logs">Daemon Log</string>
+    <string name="tab_app_logs">App Events</string>
+    <string name="tab_logcat">Logcat</string>
+    <string name="btn_clear">Clear</string>
     
     <!-- Tip -->
     <string name="tip_autolearn">💡 Auto-Learning: When only one paired phone is connected on Bluetooth and joins the car\'s 5 GHz hotspot, its Wi-Fi MAC is learned automatically from /proc/net/arp.</string>

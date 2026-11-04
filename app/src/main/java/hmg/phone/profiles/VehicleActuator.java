@@ -389,10 +389,12 @@ public class VehicleActuator {
     public static boolean executeSafeSwitch(Context context, int targetUid, boolean dismissNotice, boolean recallSeat, boolean showToast, String triggerSource) {
         String trigger = (triggerSource != null && !triggerSource.trim().isEmpty()) ? triggerSource.trim() : "Manual";
         Log.i(TAG, "executeSafeSwitch requested for Driver " + targetUid + " via " + trigger);
+        AppLogger.i(TAG, "executeSafeSwitch Driver " + targetUid + " (" + trigger + ")");
 
         // 1. SAFETY GATE: Verify Park (P)
         if (!isParkGear()) {
             Log.w(TAG, "SAFETY GATE ABORT: Vehicle is NOT in Park (P)! Action blocked.");
+            AppLogger.w(TAG, "SAFETY GATE ABORT: Vehicle is NOT in Park (P)!");
             if (showToast) {
                 showOemToast(context, "Action blocked: Vehicle is not in Park (P)");
             }
@@ -404,6 +406,7 @@ public class VehicleActuator {
         RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid), trigger);
         if (r.exitCode == 0) {
             Log.i(TAG, "Unified switch via RootBridge succeeded: " + r.output);
+            AppLogger.i(TAG, "Unified switch succeeded: " + r.output);
             return true;
         }
 

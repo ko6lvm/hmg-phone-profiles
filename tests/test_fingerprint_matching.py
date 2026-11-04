@@ -133,6 +133,18 @@ def test_auto_learning_persistence(helper_path):
     finally:
         os.remove(cfg_path)
 
+def test_helper_logs_command(helper_path):
+    print("Testing helper.sh logs and clear-logs subcommands...")
+    cmd = ["bash", helper_path, "logs"]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0, f"Helper logs failed: {res.stderr}"
+    assert "Current Status" in res.stdout or "Daemon Log" in res.stdout
+    cmd_clear = ["bash", helper_path, "clear-logs"]
+    res_clear = subprocess.run(cmd_clear, capture_output=True, text=True)
+    assert res_clear.returncode == 0, f"Helper clear-logs failed: {res_clear.stderr}"
+    assert "Logs cleared" in res_clear.stdout
+    print("  ✓ helper.sh logs and clear-logs subcommands verified")
+
 def resolve_presence(connected_bt, connected_wifi, conflict_policy="p1", current_driver=1, tcp_active=False):
     phones = [
         {"name": "Pixel 11 Pro XL", "bt": "AA:BB:CC:11:22:33", "wifi": "02:00:00:11:22:33", "driver": 1, "prio": 1},
@@ -178,6 +190,9 @@ def main():
 
     # 3. Real auto-learning persistence
     test_auto_learning_persistence(helper_path)
+
+    # 4. Logs subcommand verification
+    test_helper_logs_command(helper_path)
 
     # 4. ARP station parsing
     stations = parse_arp_stations(SAMPLE_ARP_CONTENT)

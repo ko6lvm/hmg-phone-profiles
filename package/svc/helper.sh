@@ -24,9 +24,39 @@ PID_FILE="$DATA_DIR/helper.pid"
 FALLBACK_PID="/data/local/tmp/hmg_phone_profiles_helper.pid"
 STATE_FILE="$DATA_DIR/state.json"
 FALLBACK_STATE="/data/local/tmp/hmg_phone_profiles_state.json"
+LOG_FILE="$DATA_DIR/daemon.log"
+FALLBACK_LOG="/data/local/tmp/hmg_phone_profiles_daemon.log"
 
 mkdir -p "$DATA_DIR" 2>/dev/null || true
 chmod 777 "$DATA_DIR" 2>/dev/null || true
+
+log_info() {
+    msg="[$(date '+%m-%d %H:%M:%S' 2>/dev/null || date 2>/dev/null)] $1"
+    echo "$msg"
+    target_lf="$LOG_FILE"
+    if [ ! -d "$DATA_DIR" ]; then target_lf="$FALLBACK_LOG"; fi
+    echo "$msg" >> "$target_lf" 2>/dev/null || true
+}
+
+trim_log_file() {
+    file="$1"
+    max_lines="${2:-500}"
+    [ ! -f "$file" ] && return
+    awk -v n="$max_lines" '
+    { lines[NR % n] = $0 }
+    END {
+        if (NR > n + 100) {
+            count = (NR < n ? NR : n)
+            start = (NR >= n ? NR + 1 : 1)
+            for (i = 0; i < count; i++) {
+                print lines[(start + i) % n]
+            }
+        } else {
+            exit 1
+        }
+    }
+    ' "$file" > "$file.tmp" 2>/dev/null && mv "$file.tmp" "$file" 2>/dev/null || rm -f "$file.tmp" 2>/dev/null
+}
 
 # ------------------------------------------------------------------------------
 # Parcel String Decoder (UTF-16LE from service call hex output)
@@ -132,11 +162,11 @@ execute_switch_flow() {
     trigger_source="${4:-Manual}"
     target_name=$(get_profile_name "$target_uid")
 
-    echo "[ACTION] Requesting profile switch to Driver $target_uid ($target_name) via $trigger_source..."
+    log_info "[ACTION] Requesting profile switch to Driver $target_uid ($target_name) via $trigger_source..."
 
     # STRICT SAFETY GATE: Verify Park (P)
     if ! is_in_park; then
-        echo "[ABORT] SAFETY GATE: Vehicle is NOT in Park (P)! All mutating actions blocked."
+        log_info "[ABORT] SAFETY GATE: Vehicle is NOT in Park (P)! All mutating actions blocked."
         if [ "$show_toast" = "true" ]; then
             am broadcast -a com.hkmc.intent.action.TOAST \
                 -e com.hkmc.intent.extra.TOAST_MESSAGE "Action blocked: Vehicle not in Park" \
@@ -146,7 +176,7 @@ execute_switch_flow() {
     fi
 
     # 1. In-session Profile Switch (IUserProfileService.switchUser [Tx 5])
-    echo "[STEP 1] IUserProfileService.switchUser($target_uid, false, false)..."
+    log_info "[STEP 1] IUserProfileService.switchUser($target_uid, false, false)..."
     service call com.hkmc.userprofile 5 i32 "$target_uid" i32 0 i32 0 >/dev/null 2>&1
 
     # 2. Update Pre-boot Profile for Next Ignition Cycle (Tx 44)
@@ -154,7 +184,7 @@ execute_switch_flow() {
 
     # 3. Dismiss Startup Consent Screen if enabled
     if [ "$dismiss_notice" = "true" ]; then
-        echo "[STEP 2] Dismissing ConsentScreen (factory Tx 82 & notification Tx 24)..."
+        log_info "[STEP 2] Dismissing ConsentScreen (factory Tx 82 & notification Tx 24)..."
         service call com.hkmc.factory 82 >/dev/null 2>&1 || true
         service call notification 24 i32 1 i32 "$target_uid" >/dev/null 2>&1 || true
     fi
@@ -164,14 +194,14 @@ execute_switch_flow() {
         sleep 1
         # PBACK_P1 = 4, PBACK_P2 = 5 (IVRService.set_AVNIMSButton_Cmd_AVN [Tx 14])
         cmd=$((target_uid + 3))
-        echo "[STEP 3] Emulating Door Memory Button $target_uid (cmd=$cmd)..."
+        log_info "[STEP 3] Emulating Door Memory Button $target_uid (cmd=$cmd)..."
         service call com.hkmc.vr 14 i32 "$cmd" >/dev/null 2>&1 || true
     fi
 
     # 5. Native OEM Toast Notification (~5s global across all screens)
     if [ "$show_toast" = "true" ]; then
         toast_msg="${trigger_source} - Driver ${target_uid}"
-        echo "[STEP 4] Broadcasting native OEM Toast: '$toast_msg'..."
+        log_info "[STEP 4] Broadcasting native OEM Toast: '$toast_msg'..."
         am broadcast -a com.hkmc.intent.action.TOAST \
             -e com.hkmc.intent.extra.TOAST_MESSAGE "$toast_msg" \
             --ez com.hkmc.intent.extra.TOAST_POPUPSHOWING true >/dev/null 2>&1 || true
@@ -181,7 +211,7 @@ execute_switch_flow() {
     echo "$target_uid" > "$DATA_DIR/last_switched_uid" 2>/dev/null || true
     date +%s > "$DATA_DIR/last_switched_ts" 2>/dev/null || true
 
-    echo "[SUCCESS] Profile switch to Driver $target_uid completed in Park."
+    log_info "[SUCCESS] Profile switch to Driver $target_uid completed in Park."
     return 0
 }
 
@@ -492,14 +522,17 @@ run_daemon() {
     chmod 666 "$FALLBACK_PID" 2>/dev/null || true
     chmod 666 "/data/local/tmp/autoprofile_helper.pid" 2>/dev/null || true
 
-    echo "[hmg-phone-profiles] Daemon started with PID $$."
+    log_info "[hmg-phone-profiles] Daemon started with PID $$."
 
-    trap 'echo "[hmg-phone-profiles] Shutting down..."; rm -f "$PID_FILE" "$FALLBACK_PID" "/data/local/tmp/autoprofile_helper.pid"; exit 0' SIGTERM SIGINT
+    trap 'log_info "[hmg-phone-profiles] Shutting down..."; rm -f "$PID_FILE" "$FALLBACK_PID" "/data/local/tmp/autoprofile_helper.pid"; exit 0' SIGTERM SIGINT
 
     last_switched_driver=0
 
     while true; do
         update_state_file
+
+        trim_log_file "$LOG_FILE" 500
+        trim_log_file "$FALLBACK_LOG" 500
 
         cfg=$(sync_and_get_config_path)
 
@@ -575,7 +608,7 @@ EOF
             if [ -z "$m_wifi" ] && [ -n "$wifi_macs" ]; then
                 for new_wmac in $wifi_macs; do
                     if [ "$new_wmac" != "00:00:00:00:00:00" ]; then
-                        echo "[AUTO-LEARN] Auto-learned Wi-Fi MAC $new_wmac for $m_first_name (BT: $m_bt)"
+                        log_info "[AUTO-LEARN] Auto-learned Wi-Fi MAC $new_wmac for $m_first_name (BT: $m_bt)"
                         persist_learned_wifi_mac "$m_bt" "$new_wmac" "$cfg"
                         break
                     fi
@@ -646,16 +679,16 @@ EOF
                 fi
 
                 if [ "$cooldown_active" = "true" ]; then
-                    echo "[COOLDOWN] Manual switch cooldown active ($elapsed sec < 60 sec). Suppressing auto-revert."
+                    log_info "[COOLDOWN] Manual switch cooldown active ($elapsed sec < 60 sec). Suppressing auto-revert."
                     should_switch=false
                 fi
 
                 if [ "$should_switch" = "true" ]; then
-                    echo "[DETECT] Phone ($m_first_name) matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
+                    log_info "[DETECT] Phone ($m_first_name) matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
                     if [ "$in_p" = "true" ]; then
                         execute_switch_flow "$resolved_driver" "$dismiss_notice" "$show_banner" "$m_first_name"
                     else
-                        echo "[GATE] Mutating action deferred: Gear is not in Park (P)."
+                        log_info "[GATE] Mutating action deferred: Gear is not in Park (P)."
                     fi
                 fi
             fi
@@ -797,8 +830,60 @@ case "$cmd" in
         source_label="${3:-Manual}"
         execute_switch_flow "$target" "true" "true" "$source_label"
         ;;
+    logs)
+        count="${2:-100}"
+        found=false
+        for lf in "$LOG_FILE" "$FALLBACK_LOG"; do
+            if [ -f "$lf" ]; then
+                echo "=== Daemon Log ($lf) ==="
+                awk -v n="$count" '
+                { lines[NR % n] = $0 }
+                END {
+                    cnt = (NR < n ? NR : n)
+                    start = (NR >= n ? NR + 1 : 1)
+                    for (i = 0; i < cnt; i++) print lines[(start + i) % n]
+                }
+                ' "$lf" 2>/dev/null
+                echo ""
+                found=true
+            fi
+        done
+        if [ "$found" = "false" ]; then
+            echo "No daemon.log found. Showing current status:"
+        fi
+        echo "=== Current Status ==="
+        pid=""
+        for pf in "$PID_FILE" "$FALLBACK_PID" "/data/nemesis/apps/autoprofile.selector/data/helper.pid" "/data/local/tmp/autoprofile_helper.pid"; do
+            if [ -f "$pf" ]; then
+                pid=$(cat "$pf" 2>/dev/null)
+                break
+            fi
+        done
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "Daemon: RUNNING (PID $pid)"
+        else
+            echo "Daemon: STOPPED"
+        fi
+        if is_in_park; then
+            echo "Gear: PARK (P) [MUTATING ALLOWED]"
+        else
+            echo "Gear: NOT IN PARK [MUTATING BLOCKED]"
+        fi
+        echo "Active Profile: $(get_active_profile) ($(get_profile_name $(get_active_profile)))"
+        echo "BT Connected: $(get_connected_bt_macs)"
+        echo "Wi-Fi Stations: $(get_connected_wifi_macs)"
+        if has_active_projection_tcp; then
+            echo "Active Projection: YES (Port 5288 / TCP)"
+        else
+            echo "Active Projection: NO"
+        fi
+        ;;
+    clear-logs)
+        rm -f "$LOG_FILE" "$FALLBACK_LOG" 2>/dev/null || true
+        echo "Logs cleared."
+        ;;
     *)
-        echo "Usage: helper.sh [run|status|gear|switch <1|2|0> [source]|seat <1|2>|consent|toast <msg>|detect|full-flow <1|2> [source]]"
+        echo "Usage: helper.sh [run|status|gear|switch <1|2|0> [source]|seat <1|2>|consent|toast <msg>|detect|full-flow <1|2> [source]|logs [count]|clear-logs]"
         exit 1
         ;;
 esac

@@ -13,6 +13,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -70,6 +71,16 @@ public class MainActivity extends Activity {
     private TextView mAssignDialogTitle;
     private TextView mAssignDialogMeta;
 
+    // Logs Dialog
+    private View mModalLogs;
+    private TextView mTxtLogContent;
+    private TextView mTxtLogSource;
+    private ScrollView mScrollLogs;
+    private Button mBtnFilterDaemon;
+    private Button mBtnFilterApp;
+    private Button mBtnFilterLogcat;
+    private int mCurrentLogTab = 0; // 0 = Daemon, 1 = App Events, 2 = Logcat
+
     private Typeface mHyundaiSans;
     private Typeface mKiaCube;
 
@@ -79,6 +90,8 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         mHandler = new Handler();
         mConfig = ProfileConfig.getInstance(this);
+
+        AppLogger.i(TAG, "MainActivity initialized on Gen5W KitKat (API 19)");
 
         initFonts();
         initViews();
@@ -138,6 +151,13 @@ public class MainActivity extends Activity {
 
         mModalWarning = findViewById(R.id.modal_warning_container);
         mModalAssign = findViewById(R.id.modal_assign_container);
+        mModalLogs = findViewById(R.id.modal_logs_container);
+        mTxtLogContent = (TextView) findViewById(R.id.txt_log_content);
+        mTxtLogSource = (TextView) findViewById(R.id.txt_log_source);
+        mScrollLogs = (ScrollView) findViewById(R.id.scroll_logs);
+        mBtnFilterDaemon = (Button) findViewById(R.id.btn_filter_daemon_logs);
+        mBtnFilterApp = (Button) findViewById(R.id.btn_filter_app_logs);
+        mBtnFilterLogcat = (Button) findViewById(R.id.btn_filter_logcat);
         mToastBanner = findViewById(R.id.toast_banner_overlay);
         mToastText = (TextView) findViewById(R.id.toast_message);
 
@@ -351,6 +371,60 @@ public class MainActivity extends Activity {
                 triggerTestSwitch(2);
             }
         });
+
+        findViewById(R.id.btn_view_logs).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openLogsDialog();
+            }
+        });
+
+        // Logs Dialog buttons
+        findViewById(R.id.btn_logs_dialog_close).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mModalLogs.setVisibility(View.GONE);
+            }
+        });
+        findViewById(R.id.btn_logs_dismiss).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mModalLogs.setVisibility(View.GONE);
+            }
+        });
+
+        mBtnFilterDaemon.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchLogTab(0);
+            }
+        });
+        mBtnFilterApp.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchLogTab(1);
+            }
+        });
+        mBtnFilterLogcat.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchLogTab(2);
+            }
+        });
+
+        findViewById(R.id.btn_refresh_logs).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadLogTab(mCurrentLogTab);
+            }
+        });
+
+        findViewById(R.id.btn_clear_logs).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clearCurrentLogs();
+            }
+        });
     }
 
     private void applyConfigToUi() {
@@ -478,6 +552,7 @@ public class MainActivity extends Activity {
     private void triggerTestSwitch(final int targetDriver) {
         final String label = "Manual - Driver " + targetDriver;
         showToastBanner(label);
+        AppLogger.i(TAG, "Manual test switch triggered for Driver " + targetDriver);
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -493,8 +568,10 @@ public class MainActivity extends Activity {
                     @Override
                     public void run() {
                         if (success) {
+                            AppLogger.i(TAG, "Manual switch to Driver " + targetDriver + " SUCCEEDED");
                             showToastBanner("Manual - Driver " + targetDriver);
                         } else {
+                            AppLogger.w(TAG, "Manual switch to Driver " + targetDriver + " BLOCKED (not in Park)");
                             showToastBanner("Switch blocked: Vehicle is NOT in Park (P)!");
                         }
                         refreshAllAsync(false);
@@ -505,6 +582,7 @@ public class MainActivity extends Activity {
     }
 
     private void refreshAllAsync(final boolean showToastOnComplete) {
+        AppLogger.i(TAG, "Telemetry & devices refresh started (explicit=" + showToastOnComplete + ")...");
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -613,4 +691,127 @@ public class MainActivity extends Activity {
             }
         }
     };
+
+    private void openLogsDialog() {
+        if (mModalLogs != null) {
+            mModalLogs.setVisibility(View.VISIBLE);
+            loadLogTab(mCurrentLogTab);
+        }
+    }
+
+    private void switchLogTab(int tab) {
+        mCurrentLogTab = tab;
+        loadLogTab(tab);
+    }
+
+    private void loadLogTab(final int tab) {
+        if (mBtnFilterDaemon == null || mBtnFilterApp == null || mBtnFilterLogcat == null) return;
+
+        mBtnFilterDaemon.setTextColor(tab == 0 ? getResources().getColor(R.color.accent_blue) : getResources().getColor(R.color.white));
+        mBtnFilterApp.setTextColor(tab == 1 ? getResources().getColor(R.color.accent_blue) : getResources().getColor(R.color.white));
+        mBtnFilterLogcat.setTextColor(tab == 2 ? getResources().getColor(R.color.accent_blue) : getResources().getColor(R.color.white));
+
+        if (tab == 0) {
+            mTxtLogSource.setText(R.string.tab_daemon_logs);
+            mTxtLogSource.setTextColor(getResources().getColor(R.color.accent_blue));
+            mTxtLogContent.setText("Querying daemon logs via RootBridge...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    RootBridge.Result r = RootBridge.runHelper("logs");
+                    final String content;
+                    if (r.output != null && !r.output.trim().isEmpty()) {
+                        content = r.output.trim();
+                    } else {
+                        RootBridge.Result rStat = RootBridge.runHelper("status");
+                        content = (rStat.output != null && !rStat.output.trim().isEmpty())
+                                ? ("=== Helper Status ===\n" + rStat.output.trim())
+                                : "No daemon logs or status output returned.\nVerify helper.sh daemon status in Park (P).";
+                    }
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mCurrentLogTab == 0) {
+                                mTxtLogContent.setText(content);
+                                scrollToBottom();
+                            }
+                        }
+                    });
+                }
+            }).start();
+        } else if (tab == 1) {
+            mTxtLogSource.setText(R.string.tab_app_logs);
+            mTxtLogSource.setTextColor(getResources().getColor(R.color.accent_green));
+            mTxtLogContent.setText(AppLogger.getFormattedLogs());
+            scrollToBottom();
+        } else if (tab == 2) {
+            mTxtLogSource.setText(R.string.tab_logcat);
+            mTxtLogSource.setTextColor(getResources().getColor(R.color.accent_amber));
+            mTxtLogContent.setText("Querying logcat via RootBridge...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    RootBridge.Result r = RootBridge.runCommand("/system/bin/logcat -d -v time -t 150");
+                    final String content = (r.output != null && !r.output.trim().isEmpty())
+                            ? r.output.trim()
+                            : "No logcat output returned.";
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mCurrentLogTab == 2) {
+                                mTxtLogContent.setText(content);
+                                scrollToBottom();
+                            }
+                        }
+                    });
+                }
+            }).start();
+        }
+    }
+
+    private void clearCurrentLogs() {
+        if (mCurrentLogTab == 0) {
+            mTxtLogContent.setText("Clearing daemon logs...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    RootBridge.runHelper("clear-logs");
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            loadLogTab(0);
+                        }
+                    });
+                }
+            }).start();
+        } else if (mCurrentLogTab == 1) {
+            AppLogger.clear();
+            loadLogTab(1);
+        } else if (mCurrentLogTab == 2) {
+            mTxtLogContent.setText("Clearing logcat...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    RootBridge.runCommand("/system/bin/logcat -c");
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            loadLogTab(2);
+                        }
+                    });
+                }
+            }).start();
+        }
+    }
+
+    private void scrollToBottom() {
+        if (mScrollLogs != null) {
+            mScrollLogs.post(new Runnable() {
+                @Override
+                public void run() {
+                    mScrollLogs.fullScroll(ScrollView.FOCUS_DOWN);
+                }
+            });
+        }
+    }
 }

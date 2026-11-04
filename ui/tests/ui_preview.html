@@ -1059,6 +1059,9 @@
         <button class="hkmc-bottom-btn" onclick="testSwitch(2)">
           <span>Test: Driver 2</span>
         </button>
+        <button class="hkmc-bottom-btn" style="color: var(--accent-blue);" onclick="toggleLogsDialog(true)">
+          <span>📋 View Logs</span>
+        </button>
       </footer>
 
       <!-- Dialog 1: Warning Opt-in Dialog (dialog_alert.xml style) -->
@@ -1109,6 +1112,42 @@
           </div>
           <div class="dialog-btn-bar">
             <button class="dialog-btn" onclick="closeAssignModal()">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialog 3: Logs Dialog -->
+      <div class="hkmc-dialog-scrim" id="logs-dialog">
+        <div class="hkmc-dialog-card" style="width: 800px; max-width: 90vw;">
+          <div class="dialog-title-bar">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="dialog-title">System &amp; Diagnostic Logs</span>
+              <span id="log-tab-badge" style="background:#202528; color:var(--accent-blue); padding:3px 8px; border-radius:4px; font-size:12px; font-weight:bold;">Daemon Log</span>
+            </div>
+            <button class="btn-close" style="width:50px; height:50px; background-size:36px;" onclick="toggleLogsDialog(false)"></button>
+          </div>
+          <div class="dialog-body">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+              <button class="dialog-btn" id="btn-tab-daemon" style="padding:6px 14px; font-size:13px; color:var(--accent-blue);" onclick="switchLogTab('daemon')">Daemon Log</button>
+              <button class="dialog-btn" id="btn-tab-app" style="padding:6px 14px; font-size:13px;" onclick="switchLogTab('app')">App Events</button>
+              <button class="dialog-btn" id="btn-tab-logcat" style="padding:6px 14px; font-size:13px;" onclick="switchLogTab('logcat')">Logcat</button>
+              <div style="flex:1;"></div>
+              <button class="dialog-btn" style="padding:6px 14px; font-size:13px; color:var(--accent-green);" onclick="refreshLogs()">⟳ Refresh</button>
+              <button class="dialog-btn" style="padding:6px 14px; font-size:13px; color:var(--text-secondary);" onclick="clearLogs()">Clear</button>
+            </div>
+            <div id="log-terminal" style="background:#0d1012; border:1px solid #202528; border-radius:6px; padding:12px; height:320px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.4; color:#b0bec5; white-space:pre-wrap;">=== Daemon Log (/data/nemesis/apps/hmg-phone-profiles/data/daemon.log) ===
+[11-04 08:35:00] [hmg-phone-profiles] Daemon started with PID 1842.
+[11-04 08:35:03] [SAFETY GATE] Vehicle gear confirmed in Park (P).
+[11-04 08:35:06] [DETECT] Bluetooth: Pixel 11 Pro XL (AA:BB:CC:11:22:33) connected.
+[11-04 08:35:06] [ACTION] Profile resolved -> Driver 1. Gating on Park...
+[11-04 08:35:06] [STEP 1] IUserProfileService.switchUser(1, false, false)...
+[11-04 08:35:07] [STEP 2] Dismissing ConsentScreen (factory Tx 82 & notification Tx 24)...
+[11-04 08:35:08] [STEP 3] Emulating Door Memory Button 1 (cmd=4)...
+[11-04 08:35:08] [STEP 4] Broadcasting native OEM Toast: 'Pixel 11 Pro XL - Driver 1'...
+[11-04 08:35:08] [SUCCESS] Profile switch to Driver 1 completed in Park.</div>
+          </div>
+          <div class="dialog-btn-bar">
+            <button class="dialog-btn" onclick="toggleLogsDialog(false)">Close</button>
           </div>
         </div>
       </div>
@@ -1346,6 +1385,75 @@
 
     function refreshPhones() {
       showToast('Scanning Bluetooth adapter & /proc/net/arp...');
+    }
+
+    let activeLogTab = 'daemon';
+    function toggleLogsDialog(open) {
+      const dialog = document.getElementById('logs-dialog');
+      if (open) {
+        dialog.classList.add('show');
+        refreshLogs();
+      } else {
+        dialog.classList.remove('show');
+      }
+    }
+
+    function switchLogTab(tab) {
+      activeLogTab = tab;
+      const bDaemon = document.getElementById('btn-tab-daemon');
+      const bApp = document.getElementById('btn-tab-app');
+      const bLogcat = document.getElementById('btn-tab-logcat');
+      const badge = document.getElementById('log-tab-badge');
+      bDaemon.style.color = (tab === 'daemon') ? 'var(--accent-blue)' : 'var(--text-primary)';
+      bApp.style.color = (tab === 'app') ? 'var(--accent-blue)' : 'var(--text-primary)';
+      bLogcat.style.color = (tab === 'logcat') ? 'var(--accent-blue)' : 'var(--text-primary)';
+      if (tab === 'daemon') badge.textContent = 'Daemon Log';
+      else if (tab === 'app') badge.textContent = 'App Events';
+      else badge.textContent = 'Logcat';
+      refreshLogs();
+    }
+
+    function refreshLogs() {
+      const term = document.getElementById('log-terminal');
+      if (activeLogTab === 'daemon') {
+        term.textContent = `=== Daemon Log (/data/nemesis/apps/hmg-phone-profiles/data/daemon.log) ===
+[11-04 08:35:00] [hmg-phone-profiles] Daemon started with PID 1842.
+[11-04 08:35:03] [SAFETY GATE] Vehicle gear confirmed in Park (P).
+[11-04 08:35:06] [DETECT] Bluetooth: Pixel 11 Pro XL (AA:BB:CC:11:22:33) connected.
+[11-04 08:35:06] [ACTION] Profile resolved -> Driver 1. Gating on Park...
+[11-04 08:35:06] [STEP 1] IUserProfileService.switchUser(1, false, false)...
+[11-04 08:35:07] [STEP 2] Dismissing ConsentScreen (factory Tx 82 & notification Tx 24)...
+[11-04 08:35:08] [STEP 3] Emulating Door Memory Button 1 (cmd=4)...
+[11-04 08:35:08] [STEP 4] Broadcasting native OEM Toast: 'Pixel 11 Pro XL - Driver 1'...
+[11-04 08:35:08] [SUCCESS] Profile switch to Driver 1 completed in Park.
+=== Current Status ===
+Daemon: RUNNING (PID 1842)
+Gear: PARK (P) [MUTATING ALLOWED]
+Active Profile: 1 (Driver 1)
+BT Connected: AA:BB:CC:11:22:33
+Wi-Fi Stations: 02:00:00:11:22:33
+Active Projection: NO`;
+      } else if (activeLogTab === 'app') {
+        term.textContent = `[11-04 08:35:00] [INFO] [MainActivity] MainActivity started on Gen5W head unit (KitKat API 19)
+[11-04 08:35:01] [INFO] [PhoneFingerprintManager] refreshPairedPhones: found 2 devices
+[11-04 08:35:02] [INFO] [PhoneFingerprintManager] evaluatePresence: BT=[AA:BB:CC:11:22:33], WiFi=[02:00:00:11:22:33], matched=1
+[11-04 08:35:03] [INFO] [VehicleActuator] executeSafeSwitch Driver 1 (Manual)
+[11-04 08:35:03] [INFO] [VehicleActuator] Unified switch succeeded: [SUCCESS] Profile switch to Driver 1 completed in Park.
+[11-04 08:35:05] [INFO] [MainActivity] Manual switch to Driver 1 SUCCEEDED`;
+      } else {
+        term.textContent = `11-04 08:35:00.120 1842 1842 I HmgPhoneProfiles: Daemon service listening under svcmgr
+11-04 08:35:00.125 1842 1842 I HmgPhoneProfiles: Registering broadcast receivers
+11-04 08:35:01.340 1842 1842 D BluetoothAdapter: getBondedDevices() returning 2 devices
+11-04 08:35:02.050 1842 1842 I VehicleActuator: Binder transact com.hkmc.micom.system Tx 36 == 1 (Park)
+11-04 08:35:02.100 1842 1842 I VehicleActuator: Binder transact com.hkmc.userprofile Tx 5 (switchUser) -> 1
+11-04 08:35:03.200 1842 1842 I VehicleActuator: Binder transact com.hkmc.vr Tx 14 -> cmd 4 (Seat 1)`;
+      }
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearLogs() {
+      const term = document.getElementById('log-terminal');
+      term.textContent = '(Logs cleared)';
     }
 
     // Keyboard controls for Mac pair programming
