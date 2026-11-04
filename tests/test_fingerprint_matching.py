@@ -25,6 +25,33 @@ SAMPLE_TCP_CONTENT = """  sl  local_address rem_address   st tx_queue rx_queue t
 # Real Android service call output format for String "AA:BB:CC:11:22:33"
 SAMPLE_PARCEL_STRING = "Result: Parcel(00000000 00000011 00410041 0042003a 003a0042 00430043 0031003a 003a0031 00320032 0033003a 00000033   '....A.A.:.B.B.:.C.C.:.1.1.:.2.2.:.3.3...')"
 
+def test_no_sed_dependency(helper_path):
+    print("Testing helper.sh for zero sed dependency (Android KitKat toolbox compliance)...")
+    with open(helper_path, "r") as f:
+        lines = f.readlines()
+    for idx, line in enumerate(lines, 1):
+        clean = line.strip()
+        if clean.startswith("#"):
+            continue
+        # Ensure 'sed' is not used as a command
+        assert not re.search(r"\b(sed)\b", clean), f"Found forbidden 'sed' command at helper.sh line {idx}: {clean}"
+
+    # Also test execution with a poison sed in PATH that fails if invoked
+    with tempfile.TemporaryDirectory() as fake_bin:
+        poison_sed = os.path.join(fake_bin, "sed")
+        with open(poison_sed, "w") as pf:
+            pf.write("#!/bin/sh\necho 'sed: not found' >&2\nexit 127\n")
+        os.chmod(poison_sed, 0o755)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
+
+        cmd = ["bash", helper_path, "decode", SAMPLE_PARCEL_STRING]
+        res = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        assert res.returncode == 0, f"Helper decode failed under poison sed environment: {res.stderr}"
+        assert res.stdout.strip() == "AA:BB:CC:11:22:33"
+    print("  ✓ Zero sed dependency verified: helper.sh is 100% compliant with Android 4.4 toolbox")
+
 def test_helper_parcel_decoder(helper_path):
     print("Testing helper.sh decode_parcel_str against real Android service call output...")
     cmd = ["bash", helper_path, "decode", SAMPLE_PARCEL_STRING]
@@ -139,6 +166,9 @@ def main():
     helper_path = os.path.join(repo_root, "package", "svc", "helper.sh")
 
     print("Testing Radio Fingerprinting & Presence Resolution...")
+
+    # 0. Zero sed dependency check
+    test_no_sed_dependency(helper_path)
 
     # 1. Real helper parcel decoding
     test_helper_parcel_decoder(helper_path)

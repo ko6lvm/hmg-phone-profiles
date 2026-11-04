@@ -476,7 +476,8 @@ public class MainActivity extends Activity {
     }
 
     private void triggerTestSwitch(final int targetDriver) {
-        showToastBanner("Executing switch to Driver " + targetDriver + " in Park (P)...");
+        final String label = "Manual - Driver " + targetDriver;
+        showToastBanner(label);
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -485,13 +486,14 @@ public class MainActivity extends Activity {
                     targetDriver,
                     mConfig.dismissNotice,
                     true,
-                    mConfig.showBanner
+                    mConfig.showBanner,
+                    "Manual"
                 );
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
                         if (success) {
-                            showToastBanner("Profile switched to Driver " + targetDriver + " in Park (P)");
+                            showToastBanner("Manual - Driver " + targetDriver);
                         } else {
                             showToastBanner("Switch blocked: Vehicle is NOT in Park (P)!");
                         }

@@ -34,39 +34,47 @@ chmod 777 "$DATA_DIR" 2>/dev/null || true
 
 decode_parcel_str() {
     raw="$1"
-    cleaned=$(echo "$raw" | sed "s/Result: Parcel(//g; s/'[^']*'//g; s/0x[0-9a-fA-F]*://g; s/[^0-9a-fA-F ]/ /g")
-    words=($cleaned)
-    if [ ${#words[@]} -lt 2 ]; then
-        return
-    fi
-    len_hex="${words[1]}"
-    if [ "$len_hex" = "ffffffff" ] || [ "$len_hex" = "FFFFFFFF" ]; then
-        return
-    fi
-    len=$((16#$len_hex))
-    if [ $len -le 0 ] || [ $len -gt 256 ]; then
-        return
-    fi
-    out=""
-    count=0
-    i=2
-    while [ $i -lt ${#words[@]} ] && [ $count -lt $len ]; do
-        w="${words[$i]}"
-        if [ ${#w} -eq 8 ]; then
-            c1_hex="${w:6:2}"
-            c2_hex="${w:2:2}"
-            if [ "$c1_hex" != "00" ] && [ $count -lt $len ]; then
-                out+=$(printf "\\x$c1_hex")
-                count=$((count + 1))
-            fi
-            if [ "$c2_hex" != "00" ] && [ $count -lt $len ]; then
-                out+=$(printf "\\x$c2_hex")
-                count=$((count + 1))
-            fi
-        fi
-        i=$((i + 1))
-    done
-    echo "$out"
+    [ -z "$raw" ] && return
+    echo "$raw" | awk '
+    function hex2dec(h,   d, i, c) {
+        d = 0; h = tolower(h)
+        for (i = 1; i <= length(h); i++) {
+            c = index("0123456789abcdef", substr(h, i, 1)) - 1
+            if (c < 0) return 0
+            d = d * 16 + c
+        }
+        return d
+    }
+    {
+        sub(/.*Parcel\(/, "")
+        sub(/\x27.*/, "")
+        sub(/\).*/, "")
+        n = split($0, words)
+        if (n < 2) exit
+        len_hex = tolower(words[2])
+        if (len_hex == "ffffffff") exit
+        len = hex2dec(len_hex)
+        if (len <= 0 || len > 256) exit
+        out = ""
+        count = 0
+        for (i = 3; i <= n && count < len; i++) {
+            w = words[i]
+            if (length(w) == 8) {
+                c1_val = hex2dec(substr(w, 7, 2))
+                c2_val = hex2dec(substr(w, 3, 2))
+                if (c1_val > 0 && count < len) {
+                    out = out sprintf("%c", c1_val)
+                    count++
+                }
+                if (c2_val > 0 && count < len) {
+                    out = out sprintf("%c", c2_val)
+                    count++
+                }
+            }
+        }
+        print out
+    }
+    ' 2>/dev/null
 }
 
 # ------------------------------------------------------------------------------
@@ -121,9 +129,10 @@ execute_switch_flow() {
     target_uid="$1"
     dismiss_notice="${2:-false}"
     show_toast="${3:-true}"
+    trigger_source="${4:-Manual}"
     target_name=$(get_profile_name "$target_uid")
 
-    echo "[ACTION] Requesting profile switch to Driver $target_uid ($target_name)..."
+    echo "[ACTION] Requesting profile switch to Driver $target_uid ($target_name) via $trigger_source..."
 
     # STRICT SAFETY GATE: Verify Park (P)
     if ! is_in_park; then
@@ -161,11 +170,16 @@ execute_switch_flow() {
 
     # 5. Native OEM Toast Notification (~5s global across all screens)
     if [ "$show_toast" = "true" ]; then
-        echo "[STEP 4] Broadcasting native OEM Toast..."
+        toast_msg="${trigger_source} - Driver ${target_uid}"
+        echo "[STEP 4] Broadcasting native OEM Toast: '$toast_msg'..."
         am broadcast -a com.hkmc.intent.action.TOAST \
-            -e com.hkmc.intent.extra.TOAST_MESSAGE "Switched to $target_name" \
+            -e com.hkmc.intent.extra.TOAST_MESSAGE "$toast_msg" \
             --ez com.hkmc.intent.extra.TOAST_POPUPSHOWING true >/dev/null 2>&1 || true
     fi
+
+    mkdir -p "$DATA_DIR" 2>/dev/null || true
+    echo "$target_uid" > "$DATA_DIR/last_switched_uid" 2>/dev/null || true
+    date +%s > "$DATA_DIR/last_switched_ts" 2>/dev/null || true
 
     echo "[SUCCESS] Profile switch to Driver $target_uid completed in Park."
     return 0
@@ -185,10 +199,11 @@ get_connected_bt_macs() {
     raw3=$(service call phoneprojection 8 2>/dev/null || true)
     # 4. phoneprojection Tx 9 (Android Auto BT MAC)
     raw4=$(service call phoneprojection 9 2>/dev/null || true)
-    # 5. dipo Tx 14 (CarPlay Address)
-    raw5=$(service call dipo 14 2>/dev/null || true)
 
-    for raw in "$raw1" "$raw2" "$raw3" "$raw4" "$raw5"; do
+    # Note: dipo Tx 14 is intentionally excluded because it stores the last paired
+    # CarPlay address in NVRAM, which persists even when the phone is disconnected.
+
+    for raw in "$raw1" "$raw2" "$raw3" "$raw4"; do
         decoded=$(decode_parcel_str "$raw")
         mac=$(echo "$decoded" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
         if [ -n "$mac" ]; then
@@ -196,10 +211,25 @@ get_connected_bt_macs() {
         fi
     done
 
-    # Secondary fallback: dumpsys bluetooth connected devices
+    # Secondary fallback: dumpsys bluetooth ONLY when devices are actively connected
+    # (Must not match disconnected devices or empty brackets mConnectedDevices: [])
     dump=$(dumpsys bluetooth 2>/dev/null || dumpsys bluetooth_manager 2>/dev/null || true)
     if [ -n "$dump" ]; then
-        dump_macs=$(echo "$dump" | grep -iE 'connected|mConnectedDevices' | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' || true)
+        dump_macs=$(echo "$dump" | awk '
+        /mConnectedDevices:[ \t]*\[/ {
+            line = $0
+            while (match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)) {
+                print toupper(substr(line, RSTART, RLENGTH))
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }
+        /STATE_CONNECTED|Connection state: 2/ {
+            line = $0
+            if (match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)) {
+                print toupper(substr(line, RSTART, RLENGTH))
+            }
+        }
+        ')
         for dmac in $dump_macs; do
             bt_macs="$bt_macs $dmac"
         done
@@ -247,13 +277,75 @@ get_bonded_devices() {
         echo "Connected Phone|$mac_b17"
     fi
 
-    # 3. Dumpsys bluetooth / bluetooth_manager for bonded devices
+    # 3. Last CarPlay phone from dipo
+    raw_d14=$(service call dipo 14 2>/dev/null || true)
+    mac_d14=$(decode_parcel_str "$raw_d14" | grep -o -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | tr '[:lower:]' '[:upper:]' | head -n 1)
+    if [ -n "$mac_d14" ]; then
+        echo "CarPlay Phone|$mac_d14"
+    fi
+
+    # 4. Parse persistent Bluetooth config (Bluedroid XML & Conf) - covers ALL user profiles
+    for bt_xml in /data/misc/bluedroid/bt_config.xml /data/misc/bluetoothd/bt_config.xml; do
+        if [ -f "$bt_xml" ]; then
+            awk '
+            /Tag=.*([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/ {
+                match($0, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)
+                cur_mac = toupper(substr($0, RSTART, RLENGTH))
+            }
+            cur_mac != "" && /Tag="Name"/ {
+                match($0, />[^<]+</)
+                if (RLENGTH > 2) {
+                    name = substr($0, RSTART + 1, RLENGTH - 2)
+                    print name "|" cur_mac
+                    cur_mac = ""
+                }
+            }
+            ' "$bt_xml" 2>/dev/null || true
+        fi
+    done
+
+    for bt_conf in /data/misc/bluedroid/bt_config.conf /data/misc/bluetoothd/bt_config.conf; do
+        if [ -f "$bt_conf" ]; then
+            awk '
+            /\[([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\]/ {
+                match($0, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)
+                cur_mac = toupper(substr($0, RSTART, RLENGTH))
+            }
+            cur_mac != "" && /^[ \t]*Name[ \t]*=/ {
+                sub(/^[ \t]*Name[ \t]*=[ \t]*/, "")
+                sub(/[ \r\n\t]*$/, "")
+                print $0 "|" cur_mac
+                cur_mac = ""
+            }
+            ' "$bt_conf" 2>/dev/null || true
+        fi
+    done
+
+    # 5. HKMC Bluetooth Settings shared_prefs across all user profiles (0, 10, 1, 2)
+    for sp in /data/data/com.android.btsettings/shared_prefs/*.xml /data/user/*/com.android.btsettings/shared_prefs/*.xml /data/system/users/*/com.android.btsettings*.xml; do
+        if [ -f "$sp" ]; then
+            awk '
+            /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/ && />[^<]+</ {
+                match($0, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)
+                mac = toupper(substr($0, RSTART, RLENGTH))
+                match($0, />[^<]+</)
+                if (RLENGTH > 2) {
+                    name = substr($0, RSTART + 1, RLENGTH - 2)
+                    print name "|" mac
+                }
+            }
+            ' "$sp" 2>/dev/null || true
+        fi
+    done
+
+    # 6. Dumpsys bluetooth / bluetooth_manager for bonded devices across profiles
     dump=$(dumpsys bluetooth 2>/dev/null || dumpsys bluetooth_manager 2>/dev/null || true)
     if [ -n "$dump" ]; then
         echo "$dump" | awk '
         /Bonded devices:/ { in_b = 1; next }
         /mBondedDevices:/ { in_b = 1; next }
-        /^[A-Z]/ && in_b { in_b = 0 }
+        in_b && /^[ \t]*$/ { in_b = 0 }
+        in_b && /^[^ \t]/ && !/Bonded/ { in_b = 0 }
         in_b {
             line = $0
             if (match(line, /([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/)) {
@@ -261,6 +353,8 @@ get_bonded_devices() {
                 sub(/^[ \t]*/, "", line)
                 sub(mac, "", line)
                 gsub(/[\(\)\[\]]/, "", line)
+                sub(/BR\/EDR/, "", line)
+                sub(/LE/, "", line)
                 sub(/^[ \t]*/, "", line); sub(/[ \t]*$/, "", line)
                 name = line
                 if (name == "") name = "Paired Phone"
@@ -307,30 +401,30 @@ sync_and_get_config_path() {
 parse_configured_phones() {
     cfg_file="$1"
     if [ -f "$cfg_file" ]; then
-        sed 's/[{}]/\n&\n/g; s/,/\n/g' "$cfg_file" 2>/dev/null | awk '
-        /"name":/ {
-            s = $0; sub(/^[ \t]*"name":[ \t]*"/, "", s); sub(/",?[ \t]*$/, "", s); name = s
+        awk -v RS="[,{}]" '
+        /"name"[ \t]*:/ {
+            s = $0; sub(/.*"name"[ \t]*:[ \t]*"/, "", s); sub(/".*/, "", s); name = s
         }
-        /"bt_mac":/ {
-            s = $0; sub(/^[ \t]*"bt_mac":[ \t]*"/, "", s); sub(/",?[ \t]*$/, "", s); bt = toupper(s)
+        /"bt_mac"[ \t]*:/ {
+            s = $0; sub(/.*"bt_mac"[ \t]*:[ \t]*"/, "", s); sub(/".*/, "", s); bt = toupper(s)
         }
-        /"wifi_mac":/ {
+        /"wifi_mac"[ \t]*:/ {
             if ($0 ~ /null/) { wifi = "" }
             else {
-                s = $0; sub(/^[ \t]*"wifi_mac":[ \t]*"/, "", s); sub(/",?[ \t]*$/, "", s); wifi = toupper(s)
+                s = $0; sub(/.*"wifi_mac"[ \t]*:[ \t]*"/, "", s); sub(/".*/, "", s); wifi = toupper(s)
             }
         }
-        /"assigned_driver":/ {
-            s = $0; sub(/^[ \t]*"assigned_driver":[ \t]*/, "", s); sub(/,?[ \t]*$/, "", s); driver = s
+        /"assigned_driver"[ \t]*:/ {
+            s = $0; sub(/.*"assigned_driver"[ \t]*:[ \t]*/, "", s); gsub(/[^0-9]/, "", s); driver = s
         }
-        /"priority":/ {
-            s = $0; sub(/^[ \t]*"priority":[ \t]*/, "", s); sub(/,?[ \t]*$/, "", s); prio = s
+        /"priority"[ \t]*:/ {
+            s = $0; sub(/.*"priority"[ \t]*:[ \t]*/, "", s); gsub(/[^0-9]/, "", s); prio = s
             if (bt != "" || wifi != "") {
                 print name "|" bt "|" wifi "|" driver "|" prio
             }
             name = ""; bt = ""; wifi = ""; driver = 0; prio = 0
         }
-        ' 2>/dev/null
+        ' "$cfg_file" 2>/dev/null
     else
         # Default fallback entries
         echo "Pixel 11 Pro XL|AA:BB:CC:11:22:33|02:00:00:11:22:33|1|1"
@@ -470,15 +564,18 @@ $phones_data
 EOF
 
         # Auto-learning: Single BT phone connected and a new Wi-Fi station appears
+        m_name="${matched_names#;}"
+        m_first_name="${m_name%%;*}"
+        [ -z "$m_first_name" ] && m_first_name="Phone"
+
         if [ "$matched_count" -eq 1 ]; then
             m_bt=$(echo "$matched_bts" | awk '{print $1}')
             m_wifi=$(echo "$matched_wifis" | awk '{print $1}')
-            m_name=$(echo "$matched_names" | sed 's/^;//')
 
             if [ -z "$m_wifi" ] && [ -n "$wifi_macs" ]; then
                 for new_wmac in $wifi_macs; do
                     if [ "$new_wmac" != "00:00:00:00:00:00" ]; then
-                        echo "[AUTO-LEARN] Auto-learned Wi-Fi MAC $new_wmac for $m_name (BT: $m_bt)"
+                        echo "[AUTO-LEARN] Auto-learned Wi-Fi MAC $new_wmac for $m_first_name (BT: $m_bt)"
                         persist_learned_wifi_mac "$m_bt" "$new_wmac" "$cfg"
                         break
                     fi
@@ -521,18 +618,51 @@ EOF
             fi
         fi
 
-        # Execute switch if target driver changed and auto_select is active
+        in_p=false
+        if is_in_park; then in_p=true; fi
+
+        # Manual switch cooldown check (suppress auto-revert within 60s of manual switch)
+        last_manual_ts=0
+        if [ -f "$DATA_DIR/last_switched_ts" ]; then
+            last_manual_ts=$(cat "$DATA_DIR/last_switched_ts" 2>/dev/null || echo 0)
+        fi
+        now=$(date +%s 2>/dev/null || echo 0)
+        cooldown_active=false
+        if [ "$now" -gt 0 ] && [ "$last_manual_ts" -gt 0 ]; then
+            elapsed=$((now - last_manual_ts))
+            if [ "$elapsed" -ge 0 ] && [ "$elapsed" -lt 60 ]; then
+                cooldown_active=true
+            fi
+        fi
+
+        # Execute switch if target driver resolved and auto_select is active
         if [ "$auto_select" = "true" ] && [ "$resolved_driver" -gt 0 ]; then
             if [ "$current_uid" != "$resolved_driver" ]; then
-                echo "[DETECT] Phone matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
-                if is_in_park; then
-                    execute_switch_flow "$resolved_driver" "$dismiss_notice" "$show_banner"
-                    last_switched_driver="$resolved_driver"
-                else
-                    echo "[GATE] Mutating action deferred: Gear is not in Park (P)."
+                should_switch=false
+                if [ "$resolved_driver" != "$last_resolved_driver" ]; then
+                    should_switch=true
+                elif [ "$in_p" = "true" ] && [ "$prev_in_park" = "false" ]; then
+                    should_switch=true
+                fi
+
+                if [ "$cooldown_active" = "true" ]; then
+                    echo "[COOLDOWN] Manual switch cooldown active ($elapsed sec < 60 sec). Suppressing auto-revert."
+                    should_switch=false
+                fi
+
+                if [ "$should_switch" = "true" ]; then
+                    echo "[DETECT] Phone ($m_first_name) matched Driver $resolved_driver (Current: $current_uid). Gating on Park..."
+                    if [ "$in_p" = "true" ]; then
+                        execute_switch_flow "$resolved_driver" "$dismiss_notice" "$show_banner" "$m_first_name"
+                    else
+                        echo "[GATE] Mutating action deferred: Gear is not in Park (P)."
+                    fi
                 fi
             fi
         fi
+
+        last_resolved_driver="$resolved_driver"
+        prev_in_park="$in_p"
 
         sleep 3
     done
@@ -618,11 +748,12 @@ case "$cmd" in
         get_profile_name "$uid"
         ;;
     bonded)
-        get_bonded_devices
+        get_bonded_devices | awk -F'|' '!seen[$2]++ { print $0 }'
         ;;
     switch)
         target="${2:-1}"
-        execute_switch_flow "$target" "false" "true"
+        source_label="${3:-Manual}"
+        execute_switch_flow "$target" "false" "true" "$source_label"
         ;;
     seat)
         preset="${2:-1}"
@@ -646,7 +777,7 @@ case "$cmd" in
         service call notification 24 i32 1 i32 "$uid"
         ;;
     toast)
-        msg="${2:-Switched to Driver 1}"
+        msg="${2:-Manual - Driver 1}"
         echo "Broadcasting OEM Toast: '$msg'..."
         am broadcast -a com.hkmc.intent.action.TOAST \
             -e com.hkmc.intent.extra.TOAST_MESSAGE "$msg" \
@@ -663,10 +794,11 @@ case "$cmd" in
         ;;
     full-flow)
         target="${2:-1}"
-        execute_switch_flow "$target" "true" "true"
+        source_label="${3:-Manual}"
+        execute_switch_flow "$target" "true" "true" "$source_label"
         ;;
     *)
-        echo "Usage: helper.sh [run|status|gear|switch <1|2|0>|seat <1|2>|consent|toast <msg>|detect|full-flow <1|2>]"
+        echo "Usage: helper.sh [run|status|gear|switch <1|2|0> [source]|seat <1|2>|consent|toast <msg>|detect|full-flow <1|2> [source]]"
         exit 1
         ;;
 esac

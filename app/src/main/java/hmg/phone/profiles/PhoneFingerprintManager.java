@@ -135,12 +135,13 @@ public class PhoneFingerprintManager {
             Log.w(TAG, "RootBridge detect threw: " + t.getMessage());
         }
 
-        // 2. Query direct Binder services
+        // 2. Query direct Binder services for actively connected devices
         queryBinderMac("bluetooth_manager", 17, btMacs);
         queryBinderMac("phoneprojection", 5, btMacs);
         queryBinderMac("phoneprojection", 8, btMacs);
         queryBinderMac("phoneprojection", 9, btMacs);
-        queryBinderMac("dipo", 14, btMacs);
+        // Note: dipo Tx 14 is excluded here because it returns the last paired CarPlay
+        // device from NVRAM even when disconnected.
 
         return btMacs;
     }

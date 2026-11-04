@@ -383,7 +383,12 @@ public class VehicleActuator {
      * STRICT SAFETY GATE: Completely aborts if vehicle is not in Park (P).
      */
     public static boolean executeSafeSwitch(Context context, int targetUid, boolean dismissNotice, boolean recallSeat, boolean showToast) {
-        Log.i(TAG, "executeSafeSwitch requested for Driver " + targetUid);
+        return executeSafeSwitch(context, targetUid, dismissNotice, recallSeat, showToast, "Manual");
+    }
+
+    public static boolean executeSafeSwitch(Context context, int targetUid, boolean dismissNotice, boolean recallSeat, boolean showToast, String triggerSource) {
+        String trigger = (triggerSource != null && !triggerSource.trim().isEmpty()) ? triggerSource.trim() : "Manual";
+        Log.i(TAG, "executeSafeSwitch requested for Driver " + targetUid + " via " + trigger);
 
         // 1. SAFETY GATE: Verify Park (P)
         if (!isParkGear()) {
@@ -396,7 +401,7 @@ public class VehicleActuator {
 
         // 2. Try executing unified root switch flow via helper.sh
         String subcmd = dismissNotice ? "full-flow" : "switch";
-        RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid));
+        RootBridge.Result r = RootBridge.runHelper(subcmd, String.valueOf(targetUid), trigger);
         if (r.exitCode == 0) {
             Log.i(TAG, "Unified switch via RootBridge succeeded: " + r.output);
             return true;
@@ -414,8 +419,8 @@ public class VehicleActuator {
             recallSeatMemory(targetUid);
         }
         if (showToast) {
-            String name = getUserName(targetUid);
-            showOemToast(context, "Switched to " + name);
+            String msg = trigger + " - Driver " + targetUid;
+            showOemToast(context, msg);
         }
 
         return true;
